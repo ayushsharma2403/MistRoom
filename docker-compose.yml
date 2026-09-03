@@ -1,0 +1,78 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mistroom-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+      - api_attachments:/app/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - mistroom
+
+  mysql:
+    image: mysql:8.0
+    container_name: mistroom-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mistroom_root_dev}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-mistroom}
+      MYSQL_USER: ${MYSQL_USER:-mistroom}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mistroom_dev_pass}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./infrastructure/mysql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-mistroom_root_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - mistroom
+
+  redis:
+    image: redis:7-alpine
+    container_name: mistroom-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mistroom
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  api_attachments:
+    driver: local
+
+networks:
+  mistroom:
+    driver: bridge

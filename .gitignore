@@ -2,27 +2,64 @@
 node_modules/
 .venv/
 __pycache__/
+*.pyc
+*.pyo
 
 # Build output
 dist/
 build/
+*.egg-info/
 
 # Environment
 .env
 *.env.local
+.env.production
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# Binaries (never commit these)
+# Binaries
 *.exe
 *.zip
 *.tar.gz
 
 # IDE
 .idea/
+*.iml
 
 # Logs
 *.log
 npm-debug.log*
+
+# Docker volumes
+mysql_data/
+redis_data/
+
+# Python
+*.egg
+.eggs/
+.pytest_cache/
+htmlcov/
+.coverage
+.mypy_cache/
+.ruff_cache/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.externalNativeBuild/
+*.apk
+*.aab
+*.hprof
+
+# Alembic
+alembic.ini.local
+
+# Temporary
+*.tmp
+*.bak
+*.swp
