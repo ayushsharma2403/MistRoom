@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+
+# Build output
+dist/
+build/
+
+# Environment
+.env
+*.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Binaries (never commit these)
+*.exe
+*.zip
+*.tar.gz
+
+# IDE
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
