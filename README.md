@@ -170,35 +170,38 @@ pytest tests/ -v --cov=app --cov-report=term-missing
 
 ```
 MistRoom/
-├── backend/                    # FastAPI relay server
+├── backend/                    # 🐍 Python 3.11+ FastAPI relay server
 │   ├── app/
-│   │   ├── api/v1/           # API endpoint routers
-│   │   │   ├── admin.py      # Admin endpoints
-│   │   │   ├── attachments.py # Chunked attachment uploads
-│   │   │   ├── devices.py    # Device registration & key directory
-│   │   │   ├── envelopes.py  # Encrypted envelope relay
-│   │   │   ├── relays.py     # Relay registry
-│   │   │   └── websocket.py  # Real-time WebSocket relay
-│   │   ├── core/
-│   │   │   ├── auth.py       # Ed25519 authentication
-│   │   │   ├── audit.py      # Audit event logging
-│   │   │   ├── config.py     # Application settings
-│   │   │   ├── logging.py    # Structured logging with redaction
-│   │   │   └── rate_limit.py # Redis-backed rate limiting
-│   │   ├── db/               # Database session & base
-│   │   ├── models/           # SQLAlchemy ORM models
-│   │   └── schemas/          # Pydantic request/response schemas
-│   ├── alembic/              # Database migrations
-│   └── tests/                # pytest test suite
-├── docs/
-│   ├── api.md                # REST API specification
-│   ├── architecture.md       # System architecture
-│   ├── protocol.md           # Wire protocol specification
-│   ├── threat-model.md       # Security threat model
-│   └── implementation-plan.md # Phased delivery plan
-├── infrastructure/           # Docker & deployment configs
-├── android/                  # Android app (planned)
-├── frontend/                 # Web frontend (planned)
+│   │   ├── api/v1/             # REST & WebSocket endpoint routers
+│   │   │   ├── admin.py        # Admin endpoints
+│   │   │   ├── attachments.py  # Chunked attachment uploads
+│   │   │   ├── devices.py      # Device registration & key directory
+│   │   │   ├── envelopes.py    # Encrypted envelope relay
+│   │   │   ├── relays.py       # Relay registry
+│   │   │   └── websocket.py    # Real-time WebSocket relay
+│   │   ├── core/               # Auth, config, rate limiting & logging
+│   │   ├── db/                 # Database session & models
+│   │   ├── models/             # SQLAlchemy ORM models
+│   │   ├── schemas/            # Pydantic request/response schemas
+│   │   └── services/           # Async background workers (push, TTL cleaner)
+│   ├── alembic/                # Database migrations
+│   └── tests/                  # Pytest test suite (50/50 tests passing)
+│
+├── web-client/                 # ⚡ Unified Cross-Platform App (Web + Android + iOS)
+│   ├── capacitor.config.ts     # Mobile export configuration for Android & iOS
+│   ├── vite.config.ts          # Vite bundler & Vitest configuration
+│   ├── package.json            # Client dependencies (@noble/curves, @noble/hashes, etc.)
+│   └── src/
+│       ├── core/
+│       │   ├── crypto/         # Ed25519 identity, X25519 ECDH, AES-256-GCM
+│       │   ├── mesh/           # MeshPacket binary serialization, DedupCache, Outbox
+│       │   └── transport/      # WebSocket Relay, WebRTC P2P, Capacitor BLE
+│       ├── components/         # Chat UI, TransportStatusBar, Voice Recorder
+│       └── App.tsx             # Root application component
+│
+├── android/                    # 📱 Native Kotlin BLE reference implementation
+├── docs/                       # 📚 Architecture, protocol, threat model & API specs
+├── infrastructure/             # 🐳 Docker Compose, Nginx & MySQL configs
 ├── docker-compose.yml
 └── .env.example
 ```
