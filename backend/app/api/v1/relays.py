@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -44,7 +44,7 @@ async def register_relay(
         relay_type=req.relay_type.value,
         capabilities=json.dumps(req.capabilities) if req.capabilities else None,
         max_event_size=req.max_event_size,
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(UTC),
     )
     db.add(relay)
 

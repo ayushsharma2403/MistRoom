@@ -9,18 +9,30 @@ messages, and decrypted attachments are NEVER stored or processed.
 from __future__ import annotations
 
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.api.v1 import attachments, devices, envelopes, relays
+from app.api.v1 import admin, attachments, devices, envelopes, relays
+from app.api.v1 import websocket as ws_relay
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.rate_limit import RateLimitMiddleware
 from app.db.session import engine
 
 # Track startup time for health endpoint
 _start_time: float = 0.0
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan — startup and shutdown hooks."""
+    global _start_time
+    _start_time = time.time()
+    yield
+    await engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -36,9 +48,10 @@ def create_app() -> FastAPI:
         ),
         docs_url="/docs" if settings.app_debug else None,
         redoc_url="/redoc" if settings.app_debug else None,
+        lifespan=lifespan,
     )
 
-    # ── CORS ──────────────────────────────────────────
+    # ── Middleware (order matters: last added = first executed) ────
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -46,16 +59,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    # ── Lifecycle ─────────────────────────────────────
-    @app.on_event("startup")
-    async def on_startup() -> None:
-        global _start_time
-        _start_time = time.time()
-
-    @app.on_event("shutdown")
-    async def on_shutdown() -> None:
-        await engine.dispose()
+    app.add_middleware(RateLimitMiddleware)
 
     # ── Health Endpoints ──────────────────────────────
     @app.get("/health", tags=["health"])
@@ -114,6 +118,8 @@ def create_app() -> FastAPI:
     app.include_router(envelopes.router, prefix="/api/v1")
     app.include_router(attachments.router, prefix="/api/v1")
     app.include_router(relays.router, prefix="/api/v1")
+    app.include_router(admin.router, prefix="/api/v1")
+    app.include_router(ws_relay.router, prefix="/api/v1")
 
     return app
 

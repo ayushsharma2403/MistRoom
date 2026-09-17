@@ -3,15 +3,22 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
+from app.core.audit import (
+    EVENT_ENVELOPE_DELIVERED,
+    EVENT_ENVELOPE_SUBMITTED,
+    log_audit_event,
+)
+from app.core.auth import get_authenticated_device
 from app.core.config import settings
-from app.models.models import DeliveryReceipt, MessageEnvelope
+from app.models.models import DeliveryReceipt, Device, MessageEnvelope
 from app.schemas.schemas import (
     EnvelopeReceiptRequest,
     EnvelopeResponse,
@@ -21,6 +28,7 @@ from app.schemas.schemas import (
     PendingEnvelopesResponse,
 )
 
+logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/envelopes", tags=["envelopes"])
 
 
@@ -32,12 +40,24 @@ router = APIRouter(prefix="/envelopes", tags=["envelopes"])
 )
 async def submit_envelope(
     req: EnvelopeSubmitRequest,
+    request: Request,
+    device: Device = Depends(get_authenticated_device),
     db: AsyncSession = Depends(get_db),
 ) -> EnvelopeSubmitResponse:
     """
     Submit an encrypted envelope for relay delivery.
     The server stores ONLY ciphertext — it cannot decrypt the content.
     """
+    # Verify sender_fingerprint matches authenticated device
+    if req.sender_fingerprint.lower() != device.fingerprint.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FINGERPRINT_MISMATCH",
+                "message": "sender_fingerprint does not match authenticated device",
+            },
+        )
+
     # Decode and validate payload size
     try:
         payload_bytes = base64.b64decode(req.encrypted_payload)
@@ -75,7 +95,37 @@ async def submit_envelope(
     )
     db.add(envelope)
 
-    now = datetime.now(timezone.utc)
+    # Try real-time WebSocket delivery
+    from app.api.v1.websocket import manager
+
+    if manager.is_online(req.recipient_fingerprint):
+        forwarded = await manager.send_to(
+            req.recipient_fingerprint,
+            {
+                "type": "ENVELOPE",
+                "data": {
+                    "envelope_id": req.envelope_id,
+                    "sender_fingerprint": req.sender_fingerprint,
+                    "encrypted_payload": req.encrypted_payload,
+                    "signature": req.signature,
+                    "priority": req.priority.value,
+                },
+            },
+        )
+        if forwarded:
+            envelope.is_delivered = True
+            envelope.delivered_at = datetime.now(UTC)
+
+    # Audit
+    await log_audit_event(
+        db,
+        EVENT_ENVELOPE_SUBMITTED,
+        device_fingerprint=device.fingerprint,
+        ip_address=request.client.host if request.client else None,
+        details={"recipient": req.recipient_fingerprint, "priority": req.priority.value},
+    )
+
+    now = datetime.now(UTC)
     return EnvelopeSubmitResponse(
         envelope_id=envelope.id,
         queued_at=now,
@@ -91,18 +141,29 @@ async def get_pending_envelopes(
     recipient_fingerprint: str = Query(..., min_length=32, max_length=32),
     limit: int = Query(default=50, ge=1, le=200),
     after: str | None = Query(default=None),
+    device: Device = Depends(get_authenticated_device),
     db: AsyncSession = Depends(get_db),
 ) -> PendingEnvelopesResponse:
     """
-    Retrieve pending encrypted envelopes for a device.
-    TODO: Add proper authentication in Phase 1 — currently trusts fingerprint param.
+    Retrieve pending encrypted envelopes for the authenticated device.
+    Only returns envelopes addressed to the authenticated device's fingerprint.
     """
+    # Verify the requesting device matches the recipient
+    if recipient_fingerprint.lower() != device.fingerprint.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FINGERPRINT_MISMATCH",
+                "message": "Can only retrieve envelopes for your own fingerprint",
+            },
+        )
+
     query = (
         select(MessageEnvelope)
         .where(
             MessageEnvelope.recipient_fingerprint == recipient_fingerprint.lower(),
             MessageEnvelope.is_delivered.is_(False),
-            MessageEnvelope.expires_at > datetime.now(timezone.utc),
+            MessageEnvelope.expires_at > datetime.now(UTC),
         )
         .order_by(MessageEnvelope.created_at.asc())
         .limit(limit + 1)  # Fetch one extra to check has_more
@@ -143,6 +204,8 @@ async def get_pending_envelopes(
 async def acknowledge_envelope(
     envelope_id: str,
     req: EnvelopeReceiptRequest,
+    request: Request,
+    device: Device = Depends(get_authenticated_device),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Mark an envelope as delivered."""
@@ -156,14 +219,29 @@ async def acknowledge_envelope(
             detail={"code": "ENVELOPE_NOT_FOUND", "message": "No envelope with the specified ID"},
         )
 
+    # Only the recipient can acknowledge
+    if envelope.recipient_fingerprint.lower() != device.fingerprint.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "NOT_RECIPIENT", "message": "Only the recipient can acknowledge"},
+        )
+
     envelope.is_delivered = True
     envelope.delivered_at = req.received_at
 
     receipt = DeliveryReceipt(
         envelope_id=envelope_id,
-        device_fingerprint=envelope.recipient_fingerprint,
+        device_fingerprint=device.fingerprint,
         receipt_type="DELIVERED",
     )
     db.add(receipt)
+
+    # Audit
+    await log_audit_event(
+        db,
+        EVENT_ENVELOPE_DELIVERED,
+        device_fingerprint=device.fingerprint,
+        details={"envelope_id": envelope_id},
+    )
 
     return {"status": "acknowledged", "envelope_id": envelope_id}

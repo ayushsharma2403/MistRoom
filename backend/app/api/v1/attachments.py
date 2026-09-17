@@ -5,15 +5,22 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
+from app.core.audit import (
+    EVENT_ATTACHMENT_COMPLETED,
+    EVENT_ATTACHMENT_CREATED,
+    log_audit_event,
+)
+from app.core.auth import get_authenticated_device
 from app.core.config import settings
-from app.models.models import AttachmentChunk, AttachmentMetadata
+from app.models.models import AttachmentChunk, AttachmentMetadata, Device
 from app.schemas.schemas import (
     AttachmentCompleteRequest,
     AttachmentCompleteResponse,
@@ -25,6 +32,7 @@ from app.schemas.schemas import (
     MissingChunksResponse,
 )
 
+logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/attachments", tags=["attachments"])
 
 # Storage directory for encrypted chunks
@@ -39,9 +47,21 @@ CHUNK_STORAGE_DIR = os.environ.get("CHUNK_STORAGE_DIR", "/app/storage/chunks")
 )
 async def create_attachment(
     req: AttachmentCreateRequest,
+    request: Request,
+    device: Device = Depends(get_authenticated_device),
     db: AsyncSession = Depends(get_db),
 ) -> AttachmentCreateResponse:
     """Create an attachment transfer session for chunked upload."""
+    # Verify sender
+    if req.sender_fingerprint.lower() != device.fingerprint.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FINGERPRINT_MISMATCH",
+                "message": "sender_fingerprint does not match authenticated device",
+            },
+        )
+
     if req.total_size > settings.max_attachment_size_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -74,10 +94,23 @@ async def create_attachment(
     )
     db.add(attachment)
 
+    # Audit
+    await log_audit_event(
+        db,
+        EVENT_ATTACHMENT_CREATED,
+        device_fingerprint=device.fingerprint,
+        ip_address=request.client.host if request.client else None,
+        details={
+            "recipient": req.recipient_fingerprint,
+            "total_size": req.total_size,
+            "chunk_count": req.chunk_count,
+        },
+    )
+
     return AttachmentCreateResponse(
         attachment_id=attachment.id,
         upload_url_prefix=f"/api/v1/attachments/{attachment.id}/chunks/",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -90,6 +123,7 @@ async def upload_chunk(
     attachment_id: str,
     chunk_index: int,
     request: Request,
+    device: Device = Depends(get_authenticated_device),
     db: AsyncSession = Depends(get_db),
 ) -> ChunkUploadResponse:
     """Upload a single encrypted chunk."""
@@ -100,6 +134,13 @@ async def upload_chunk(
     attachment = result.scalar_one_or_none()
     if not attachment:
         raise HTTPException(status_code=404, detail="Attachment not found")
+
+    # Verify sender owns the attachment
+    if attachment.sender_fingerprint.lower() != device.fingerprint.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "NOT_OWNER", "message": "Only the sender can upload chunks"},
+        )
 
     if chunk_index < 0 or chunk_index >= attachment.chunk_count:
         raise HTTPException(status_code=400, detail="Invalid chunk index")
@@ -163,6 +204,7 @@ async def upload_chunk(
 )
 async def get_missing_chunks(
     attachment_id: str,
+    device: Device = Depends(get_authenticated_device),
     db: AsyncSession = Depends(get_db),
 ) -> MissingChunksResponse:
     """Get list of chunks not yet uploaded (for resume)."""
@@ -172,6 +214,16 @@ async def get_missing_chunks(
     attachment = result.scalar_one_or_none()
     if not attachment:
         raise HTTPException(status_code=404, detail="Attachment not found")
+
+    # Only sender or recipient may check
+    if device.fingerprint.lower() not in (
+        attachment.sender_fingerprint.lower(),
+        attachment.recipient_fingerprint.lower(),
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "NOT_AUTHORIZED", "message": "Not sender or recipient"},
+        )
 
     chunks_result = await db.execute(
         select(AttachmentChunk.chunk_index).where(
@@ -197,6 +249,8 @@ async def get_missing_chunks(
 async def complete_attachment(
     attachment_id: str,
     req: AttachmentCompleteRequest,
+    request: Request,
+    device: Device = Depends(get_authenticated_device),
     db: AsyncSession = Depends(get_db),
 ) -> AttachmentCompleteResponse:
     """Signal that all chunks are uploaded; verify completeness."""
@@ -206,6 +260,13 @@ async def complete_attachment(
     attachment = result.scalar_one_or_none()
     if not attachment:
         raise HTTPException(status_code=404, detail="Attachment not found")
+
+    # Verify sender
+    if attachment.sender_fingerprint.lower() != device.fingerprint.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "NOT_OWNER", "message": "Only the sender can complete"},
+        )
 
     # Check all chunks are present
     if attachment.completed_chunks < attachment.chunk_count:
@@ -220,6 +281,14 @@ async def complete_attachment(
     # Verify file hash matches
     verified = req.final_hash.lower() == attachment.file_hash.lower()
     attachment.status = "COMPLETE" if verified else "UPLOADING"
+
+    # Audit
+    await log_audit_event(
+        db,
+        EVENT_ATTACHMENT_COMPLETED,
+        device_fingerprint=device.fingerprint,
+        details={"attachment_id": attachment_id, "verified": verified},
+    )
 
     return AttachmentCompleteResponse(
         attachment_id=attachment_id,
