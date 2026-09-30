@@ -19,7 +19,7 @@ function join() {
 if (me) { $('join').style.display = 'none'; connect(); }
 
 function connect() {
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
   ws.onopen = () => { retry = 0; setStatus(true); ws.send(JSON.stringify({ t: 'join', name: me })); };
   ws.onclose = () => { setStatus(false); setTimeout(connect, Math.min(1000 * ++retry, 5000)); };
   ws.onmessage = e => {
@@ -27,6 +27,7 @@ function connect() {
     if (d.t === 'history') { all = d.history; render(); }
     if (d.t === 'msg') { all.push(d.msg); add(d.msg); pin(); }
     if (d.t === 'people') people(d.people);
+    if (d.t === 'summary') sys('Summary: ' + d.text);
   };
 }
 function setStatus(on) { $('dot').className = 'dot' + (on ? ' on' : ''); $('st').textContent = on ? 'Connected' : 'Reconnecting'; }
@@ -52,14 +53,13 @@ function pin() {
 }
 function sys(t) { const d = document.createElement('div'); d.className = 'sys'; d.textContent = t; $('list').append(d); $('list').scrollTop = 1e9; }
 
-function post(text, forceSos) {
-  if (!text || ws.readyState !== 1) return;
-  const ai = forceSos ? { cat: 'sos', prio: 3 } : triage(text);   // on-device AI tag
-  ws.send(JSON.stringify({ t: 'msg', id: uid(), text, cat: ai.cat, prio: ai.prio }));
+function post(text, sos) {
+  if (!text || !ws || ws.readyState !== 1) return sys('Not connected yet. Wait for the green dot.');
+  ws.send(JSON.stringify({ t: 'msg', id: uid(), text, sos: !!sos }));  // Python backend does the AI tagging
 }
 $('f').onsubmit = e => { e.preventDefault(); post($('text').value.trim()); $('text').value = ''; };
 $('sos').onclick = () => post('SOS! I need help. ' + ($('text').value.trim() || ''), true);
-$('sum').onclick = () => sys('Summary: ' + summarize(all));
+$('sum').onclick = () => ws && ws.readyState === 1 && ws.send(JSON.stringify({ t: 'summary' }));
 $('showp').onclick = () => { const s = $('side'); s.style.cssText = s.style.display === 'block' ? '' : 'display:block;position:fixed;right:0;top:54px;bottom:0;z-index:4'; };
 
 function people(list) {
