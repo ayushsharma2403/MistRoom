@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#173B45">
+<link rel="manifest" href="manifest.json">
+<title>MistRoom</title>
+<style>
+:root{--fog:#DDE6EA;--paper:#F3F7F8;--ink:#14262E;--deep:#173B45;--sea:#2F7F86;--mute:#63797F;--line:#C3D1D6;--sos:#D93A25;--med:#B5541C;--ok:#2F7F86}
+@media (prefers-color-scheme:dark){:root{--fog:#0F1C21;--paper:#16272E;--ink:#E4EEF1;--deep:#0A1418;--sea:#5CB5BC;--mute:#8CA3AA;--line:#27404A}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--fog);color:var(--ink);display:flex;flex-direction:column}
+header{background:var(--deep);color:#EAF3F5;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:12px}
+.logo{font:700 22px Georgia,"Times New Roman",serif;letter-spacing:.3px;user-select:none;cursor:pointer}
+.logo i{font-style:normal;color:#7FD0D6}
+.status{margin-left:auto;font-size:13px;display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;background:#888}.dot.on{background:#5CE0A0}
+main{flex:1;display:flex;min-height:0}
+#chat{flex:1;display:flex;flex-direction:column;min-width:0}
+#pinned{background:var(--sos);color:#fff;padding:8px 14px;font-weight:600;display:none}
+#list{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:min(520px,86%);background:var(--paper);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:8px 12px;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;border-radius:14px 14px 4px 14px;background:#CFE7EA;border-color:#A9D0D5}
+@media (prefers-color-scheme:dark){.msg.me{background:#1F4450;border-color:#2F6070}}
+.meta{font-size:12px;color:var(--mute);display:flex;gap:8px;margin-bottom:2px}
+.tag{font-weight:700;color:var(--med)}
+.msg.sos{border:2px solid var(--sos);background:#FCE6E2}
+@media (prefers-color-scheme:dark){.msg.sos{background:#3A1A16}}
+.msg.sos .tag{color:var(--sos)}
+.msg.medical{border-left:5px solid var(--med)}
+.msg.water,.msg.shelter{border-left:5px solid var(--ok)}
+.sys{align-self:center;font-size:13px;color:var(--mute);text-align:center;max-width:90%}
+form{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--paper);border-top:1px solid var(--line)}
+input{font:inherit;color:inherit;background:var(--fog);border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-width:0}
+#text{flex:1}
+button{font:inherit;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;background:var(--sea);color:#fff;font-weight:600}
+button:focus-visible,input:focus-visible{outline:3px solid #7FD0D6;outline-offset:2px}
+#sos{background:var(--sos);letter-spacing:.5px}
+aside{width:230px;background:var(--paper);border-left:1px solid var(--line);padding:14px;overflow-y:auto}
+aside h3{margin:0 0 8px;font-size:15px}
+.radar{position:relative;width:100%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,var(--line) 1px,transparent 1px) center/100% 100%;border:1px solid var(--line);margin-bottom:12px;overflow:hidden}
+.radar::before,.radar::after{content:"";position:absolute;inset:25%;border:1px solid var(--line);border-radius:50%}
+.radar::after{inset:0;background:conic-gradient(from 0deg,transparent 0 300deg,rgba(92,181,188,.35));animation:sweep 4s linear infinite;border:0}
+.radar b{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--sea);transform:translate(-50%,-50%)}
+.radar b.you{background:var(--sos)}
+@keyframes sweep{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.radar::after{animation:none}}
+ul{list-style:none;padding:0;margin:0;font-size:14px}li{padding:3px 0}
+#sum{margin-top:12px;width:100%;background:var(--deep)}
+#join{position:fixed;inset:0;background:var(--fog);display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:26px;max-width:360px;width:100%;text-align:center}
+.card h1{font:700 34px Georgia,serif;margin:0 0 6px;color:var(--deep)}
+@media (prefers-color-scheme:dark){.card h1{color:#EAF3F5}}
+.card p{color:var(--mute);margin:0 0 16px}
+.card input{width:100%;margin-bottom:10px}.card button{width:100%}
+.qr{width:120px;height:120px;margin:14px auto 0;background:#fff;padding:4px;border-radius:8px}
+.qr img{width:100%}
+@media (max-width:640px){aside{display:none}#showp{display:inline-block!important}}
+#showp{display:none;background:transparent;border:1px solid #7FD0D6;padding:4px 10px}
+</style>
+</head>
+<body>
+<div id="join"><div class="card">
+  <h1>MistRoom</h1>
+  <p>Chat with people nearby. No internet, no account.</p>
+  <input id="name" maxlength="20" placeholder="Your nickname" autocomplete="off">
+  <button id="go">Join the room</button>
+  <div class="qr" id="qrbox" hidden><img src="/qr.svg" alt="QR code to join"></div>
+</div></div>
+
+<header>
+  <div class="logo" id="logo">Mist<i>Room</i></div>
+  <button id="showp">People</button>
+  <div class="status"><span class="dot" id="dot"></span><span id="st">Connecting</span></div>
+</header>
+<main>
+  <section id="chat">
+    <div id="pinned"></div>
+    <div id="list" aria-live="polite"></div>
+    <form id="f">
+      <input id="text" placeholder="Type a message" autocomplete="off" maxlength="500">
+      <button>Send</button>
+      <button type="button" id="sos">SOS</button>
+    </form>
+  </section>
+  <aside id="side">
+    <h3>Nearby <span id="count"></span></h3>
+    <div class="radar" id="radar"></div>
+    <ul id="people"></ul>
+    <button id="sum">Summarize situation</button>
+  </aside>
+</main>
+<script src="ai.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
