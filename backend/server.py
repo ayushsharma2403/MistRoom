@@ -38,7 +38,7 @@ except ImportError:
 # -------------------------------------------------------------
 # 2. CONFIGURATION & DATABASE LAYER
 # -------------------------------------------------------------
-PORT = int(os.getenv("PORT", 3000))
+PORT = int(os.getenv("PORT", 3001))
 MYSQL_HOST = os.getenv("MYSQL_HOST")
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
 MYSQL_USER = os.getenv("MYSQL_USER", "mistroom_user")
