@@ -39,6 +39,7 @@
           maxlength="20" 
           autocomplete="off" 
           autofocus 
+          onclick="this.focus(); this.select();"
           required
         />
       </div>
@@ -52,6 +53,7 @@
             placeholder="Room secret passkey" 
             value="mistroom-safe" 
             autocomplete="off" 
+            onclick="this.focus();"
             required
           />
           <button type="button" id="toggle-eye" class="icon-btn" title="Toggle Visibility">👁️</button>
