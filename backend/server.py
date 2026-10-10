@@ -149,6 +149,8 @@ async def add_no_cache_headers(request, call_next):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+    if request.url.path in ("/", "/index.html"):
+        response.headers["Clear-Site-Data"] = '"cache"'
     return response
 
 # -------------------------------------------------------------
@@ -188,6 +190,17 @@ def get_qr_svg():
         <text x="50%" y="60%" text-anchor="middle" font-size="10" fill="#2F7F86" font-family="sans-serif">{LAN_URL}</text>
     </svg>'''
     return Response(svg_fallback, media_type="image/svg+xml")
+
+@app.get("/reset-cache")
+def reset_cache():
+    """Wipes all browser cache, service workers, and storage for this origin."""
+    response = Response(
+        content='''<!DOCTYPE html><html><head><meta http-equiv="refresh" content="1;url=/"><title>Resetting Cache...</title></head><body style="font-family:sans-serif;background:#0B132B;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="text-align:center;"><h2>Clearing Browser Cache & Service Workers...</h2><p>Redirecting to fresh MistRoom in 1 second...</p></div></body></html>''',
+        media_type="text/html"
+    )
+    response.headers["Clear-Site-Data"] = '"cache", "cookies", "storage"'
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 
 @app.get("/api/info")
 def get_info():
