@@ -442,8 +442,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Join button & Enter key
   $('join-btn').onclick = handleJoin;
-  $('nickname-input').onkeydown = e => e.key === 'Enter' && handleJoin();
-  $('passkey-input').onkeydown = e => e.key === 'Enter' && handleJoin();
+  $('nickname-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleJoin();
+    }
+  });
+  $('passkey-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleJoin();
+    }
+  });
 
   // Eye toggle button
   $('toggle-eye').onclick = () => {

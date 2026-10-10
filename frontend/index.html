@@ -16,7 +16,7 @@
     caches.keys().then(keys => keys.forEach(key => caches.delete(key)));
   }
 </script>
-<link rel="stylesheet" href="style.css?v=6.0">
+<link rel="stylesheet" href="style.css?v=7.0">
 </head>
 <body>
 
@@ -29,7 +29,7 @@
       <p>Privacy-First Anonymous Chat & Emergency Mesh</p>
     </div>
 
-    <form id="join-form" onsubmit="return false;">
+    <div id="join-form">
       <div class="form-group">
         <label for="nickname-input">Your Nickname</label>
         <input 
@@ -39,8 +39,7 @@
           maxlength="20" 
           autocomplete="off" 
           autofocus 
-          onclick="this.focus(); this.select();"
-          required
+          style="background:#1e293b !important; color:#ffffff !important; caret-color:#06D6A0 !important; -webkit-text-fill-color:#ffffff !important; opacity:1 !important;"
         />
       </div>
 
@@ -53,8 +52,7 @@
             placeholder="Room secret passkey" 
             value="mistroom-safe" 
             autocomplete="off" 
-            onclick="this.focus();"
-            required
+            style="background:#1e293b !important; color:#ffffff !important; caret-color:#06D6A0 !important; -webkit-text-fill-color:#ffffff !important; opacity:1 !important;"
           />
           <button type="button" id="toggle-eye" class="icon-btn" title="Toggle Visibility">👁️</button>
         </div>
@@ -72,7 +70,6 @@
           <img src="/qr.svg" alt="Scan to join from mobile device" />
         </div>
       </div>
-    </form>
   </div>
 </div>
 
@@ -144,6 +141,6 @@
   </div>
 </div>
 
-<script src="app.js?v=6.0"></script>
+<script src="app.js?v=7.0"></script>
 </body>
 </html>
