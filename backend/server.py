@@ -28,76 +28,12 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # -------------------------------------------------------------
-# 1. OFFLINE NLP EMERGENCY TRIAGE ENGINE
+# 1. OFFLINE NLP EMERGENCY TRIAGE & SITREP ENGINE (ai.py)
 # -------------------------------------------------------------
-TRIAGE_RULES: List[Tuple[str, int, List[str]]] = [
-    (
-        "sos",
-        3,
-        [
-            "sos", "help", "emergency", "trapped", "drowning", "fire",
-            "collapsed", "attack", "dying", "danger", "khatra", "madad",
-            "bachao", "aag", "phans gaye", "phas gaya", "doob", "rescue"
-        ],
-    ),
-    (
-        "medical",
-        2,
-        [
-            "bleeding", "injured", "injury", "hurt", "unconscious", "broken",
-            "fracture", "pain", "medicine", "doctor", "ambulance", "pregnant",
-            "insulin", "asthma", "heart attack", "stroke", "burn", "dawai",
-            "ghayal", "chot", "khoon", "dard", "saans", "behosh"
-        ],
-    ),
-    (
-        "water",
-        1,
-        [
-            "water", "clean water", "drinking water", "food", "ration", "hungry",
-            "starving", "thirsty", "milk", "baby food", "paani", "khana",
-            "bhook", "pyaas", "doodh"
-        ],
-    ),
-    (
-        "shelter",
-        1,
-        [
-            "shelter", "roof", "blanket", "tarp", "cold", "hypothermia", "stuck",
-            "road blocked", "evacuate", "landslide", "flood", "safe place", "ghar",
-            "rescue camp", "chhat", "sardi", "thand", "sharan"
-        ],
-    ),
-]
-
-URGENCY_WORDS = ["urgent", "immediately", "right now", "jaldi", "turant", "critical", "asap", "severe"]
-
-def triage_message(text: str) -> Tuple[str, int]:
-    """Classifies message into emergency categories (sos, medical, water, shelter, general) and priority (0-3)."""
-    t = (text or "").lower()
-    best = ("general", 0, 0)
-    for cat, prio, words in TRIAGE_RULES:
-        score = sum(1 for w in words if re.search(r'\b' + re.escape(w) + r'\b', t) or w in t)
-        if score > 0:
-            if prio > best[1] or (prio == best[1] and score > best[2]):
-                best = (cat, prio, score)
-    cat, prio, _ = best
-    has_urgency = any(w in t for w in URGENCY_WORDS) or ("!" in text) or (len(text) > 4 and text.isupper())
-    if has_urgency and 0 < prio < 3:
-        prio += 1
-    return cat, prio
-
-def generate_sitrep(messages: List[Dict]) -> str:
-    """Generates an emergency situation report for rescue responders."""
-    if not messages:
-        return "No emergency messages recorded in this cluster."
-    count = lambda c: sum(1 for m in messages if m.get("cat") == c)
-    unique_senders = len({m.get("from") or m.get("sender") for m in messages})
-    return (
-        f"[SITUATION REPORT] {len(messages)} messages from {unique_senders} active peer(s).\n"
-        f"Priority Breakdown -> SOS: {count('sos')} | Medical: {count('medical')} | "
-        f"Water/Food: {count('water')} | Shelter: {count('shelter')}."
-    )
+try:
+    from backend.ai import triage as triage_message, summarize as generate_sitrep, RULES as TRIAGE_RULES
+except ImportError:
+    from ai import triage as triage_message, summarize as generate_sitrep, RULES as TRIAGE_RULES
 
 # -------------------------------------------------------------
 # 2. CONFIGURATION & DATABASE LAYER
@@ -205,6 +141,15 @@ async def lifespan(app: FastAPI):
         await db_pool.wait_closed()
 
 app = FastAPI(title="MistRoom", lifespan=lifespan)
+
+@app.middleware("http")
+async def add_no_cache_headers(request, call_next):
+    response = await call_next(request)
+    # Ensure browsers and proxies never serve stale cached HTML, JS, or CSS
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # -------------------------------------------------------------
 # 4. WEBSOCKET & PEER STATE

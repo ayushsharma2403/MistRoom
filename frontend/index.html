@@ -5,7 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0F172A">
 <title>MistRoom – Anonymous Mesh Chat</title>
-<link rel="stylesheet" href="style.css?v=1.0">
+<script>
+  // Immediately kill any lingering Service Worker or Cache Storage from previous sessions
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      for (const reg of regs) reg.unregister();
+    });
+  }
+  if ('caches' in window) {
+    caches.keys().then(keys => keys.forEach(key => caches.delete(key)));
+  }
+</script>
+<link rel="stylesheet" href="style.css?v=5.0">
 </head>
 <body>
 
@@ -131,6 +142,6 @@
   </div>
 </div>
 
-<script src="app.js?v=4.0"></script>
+<script src="app.js?v=5.0"></script>
 </body>
 </html>
