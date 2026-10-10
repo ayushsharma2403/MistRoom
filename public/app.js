@@ -1,8 +1,17 @@
 // MistRoom: Privacy-First Anonymous Chat + E2EE + WebRTC Mesh + Offline AI
 const $ = id => document.getElementById(id);
 
-let ws, me = localStorage.getItem('mr_name') || '';
-let passkey = localStorage.getItem('mr_secret') || 'mistroom-safe';
+// Explicitly unregister any active Service Workers so users always get fresh code
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
+  }).catch(() => {});
+}
+
+let ws, me = '';
+let passkey = 'mistroom-safe';
 let cryptoKey = null;
 let myPeerId = 'p_' + Math.random().toString(36).slice(2, 9);
 let all = [], retry = 0;
@@ -178,14 +187,15 @@ function broadcastP2P(msg) {
   return sentCount;
 }
 
+// -------------------------------------------------------------
+// 4. APP INITIALIZATION & USER JOIN
+// -------------------------------------------------------------
 async function join() {
   const n = $('name').value.trim();
   const s = $('secret').value.trim() || 'mistroom-safe';
   if (!n) return $('name').focus();
   me = n;
   passkey = s;
-  localStorage.setItem('mr_name', me);
-  localStorage.setItem('mr_secret', passkey);
   cryptoKey = await deriveKey(passkey);
 
   $('join').style.display = 'none';
@@ -193,29 +203,31 @@ async function join() {
 }
 
 function initApp() {
-  if ($('qrbox')) $('qrbox').hidden = false;
-  $('name').value = me || '';
-  if (passkey) $('secret').value = passkey;
+  const nameInput = $('name');
+  const secretInput = $('secret');
+  const eyeBtn = $('eye');
+  const goBtn = $('go');
 
-  if ($('eye')) {
-    $('eye').onclick = () => {
-      const sec = $('secret');
-      if (sec.type === 'password') {
-        sec.type = 'text';
-        $('eye').textContent = '🔒';
+  if ($('qrbox')) $('qrbox').hidden = false;
+
+  if (eyeBtn && secretInput) {
+    eyeBtn.onclick = () => {
+      if (secretInput.type === 'password') {
+        secretInput.type = 'text';
+        eyeBtn.textContent = '🔒';
       } else {
-        sec.type = 'password';
-        $('eye').textContent = '👁️';
+        secretInput.type = 'password';
+        eyeBtn.textContent = '👁️';
       }
     };
   }
 
-  $('go').onclick = join;
-  $('name').onkeydown = e => e.key === 'Enter' && join();
-  $('secret').onkeydown = e => e.key === 'Enter' && join();
+  if (goBtn) goBtn.onclick = join;
+  if (nameInput) nameInput.onkeydown = e => e.key === 'Enter' && join();
+  if (secretInput) secretInput.onkeydown = e => e.key === 'Enter' && join();
 
   setTimeout(() => {
-    if (!$('name').value) $('name').focus();
+    if (nameInput) nameInput.focus();
   }, 100);
 }
 
@@ -225,6 +237,9 @@ if (document.readyState === 'loading') {
   initApp();
 }
 
+// -------------------------------------------------------------
+// 5. WEBSOCKET MESSAGING & PRESENCE
+// -------------------------------------------------------------
 function connect() {
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
   ws.onopen = () => {
@@ -260,47 +275,49 @@ function connect() {
     if (d.t === 'people') {
       peersList = d.people;
       people(d.people);
-      // Auto-connect WebRTC mesh with other peers
+      // Auto-establish WebRTC P2P DataChannels
       d.people.forEach(p => {
         if (p.peer_id && p.peer_id !== myPeerId && !meshPeers.has(p.peer_id)) {
-          // Deterministic initiator choice to avoid offer race conditions
-          const isInitiator = myPeerId > p.peer_id;
+          const isInitiator = myPeerId < p.peer_id;
           setupWebRTC(p.peer_id, isInitiator);
         }
       });
     }
+    // WebRTC Signaling handling
     if (d.t === 'webrtc_offer') {
-      const { sender, data } = d;
-      setupWebRTC(sender, false);
+      const sender = d.sender;
+      if (!meshPeers.has(sender)) setupWebRTC(sender, false);
       const peer = meshPeers.get(sender);
-      if (peer) {
-        await peer.pc.setRemoteDescription(new RTCSessionDescription(data));
+      if (peer && peer.pc) {
+        await peer.pc.setRemoteDescription(new RTCSessionDescription(d.data));
         const answer = await peer.pc.createAnswer();
         await peer.pc.setLocalDescription(answer);
-        ws.send(JSON.stringify({ t: 'webrtc_answer', target: sender, data: peer.pc.localDescription }));
+        ws.send(JSON.stringify({ t: 'webrtc_answer', target: sender, data: answer }));
       }
     }
     if (d.t === 'webrtc_answer') {
-      const { sender, data } = d;
-      const peer = meshPeers.get(sender);
-      if (peer) {
-        await peer.pc.setRemoteDescription(new RTCSessionDescription(data));
+      const peer = meshPeers.get(d.sender);
+      if (peer && peer.pc) {
+        await peer.pc.setRemoteDescription(new RTCSessionDescription(d.data));
       }
     }
     if (d.t === 'webrtc_ice') {
-      const { sender, data } = d;
-      const peer = meshPeers.get(sender);
-      if (peer && data) {
-        try { await peer.pc.addIceCandidate(new RTCIceCandidate(data)); } catch (err) {}
+      const peer = meshPeers.get(d.sender);
+      if (peer && peer.pc && d.data) {
+        try {
+          await peer.pc.addIceCandidate(new RTCIceCandidate(d.data));
+        } catch (err) {}
       }
     }
-    if (d.t === 'summary') sys(d.text);
+    if (d.t === 'summary') {
+      sys('📋 AI Situation Report:\n' + d.text);
+    }
   };
 }
 
-function setStatus(on) {
-  $('dot').className = 'dot' + (on ? ' on' : '');
-  $('st').textContent = on ? 'Server Connected' : 'Offline Mesh';
+function setStatus(online) {
+  $('dot').className = 'dot' + (online ? ' on' : '');
+  $('st').textContent = online ? 'Online' : 'Reconnecting...';
 }
 
 function add(m, scroll = true) {

@@ -146,11 +146,16 @@ li span.p2p{font-size:10px;color:var(--mesh);background:rgba(139,92,246,0.15);pa
 </main>
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration error:', err));
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    for (const r of registrations) { r.unregister(); }
+  });
+}
+if ('caches' in window) {
+  caches.keys().then(keys => {
+    keys.forEach(k => caches.delete(k));
   });
 }
 </script>
-<script src="app.js?v=3.1"></script>
+<script src="app.js?v=999"></script>
 </body>
 </html>
