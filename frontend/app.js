@@ -431,6 +431,15 @@ function renderPeers(peers) {
 // 6. INITIALIZATION & DOM EVENTS
 // -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
+  // Explicitly focus nickname input
+  setTimeout(() => {
+    const ni = $('nickname-input');
+    if (ni) {
+      ni.focus();
+      ni.select?.();
+    }
+  }, 100);
+
   // Join button & Enter key
   $('join-btn').onclick = handleJoin;
   $('nickname-input').onkeydown = e => e.key === 'Enter' && handleJoin();

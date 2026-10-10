@@ -116,6 +116,12 @@ html, body {
   border: 1.5px solid var(--border);
   border-radius: 12px;
   outline: none;
+  cursor: text;
+  pointer-events: auto !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  position: relative;
+  z-index: 10;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
