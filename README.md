@@ -1,58 +1,57 @@
-# MistRoom – Privacy-First Anonymous Chat Application
+# MistRoom – Privacy-First Anonymous Emergency Mesh Chat
 
-> **Tech Stack:** Python (FastAPI), WebSockets, End-to-End Encryption (AES-256-GCM), MySQL, WebRTC Mesh, Docker Compose
+> **Tech Stack:** Python (FastAPI), WebSockets, WebCrypto E2EE (AES-256-GCM), MySQL 8.0, WebRTC P2P DataChannels, Docker Compose
 
-MistRoom is an offline-capable, privacy-first emergency communication application designed for disaster relief and local network mesh messaging. It requires no central cloud, no user accounts, and enforces a strict zero-logging design.
-
----
-
-## 🌟 Key Highlights & Architecture
-
-- **End-to-End Encryption (E2EE) & Zero-Logging**:
-  Client-side AES-256-GCM encryption using the native Web Crypto API (`window.crypto.subtle`) with PBKDF2 key derivation. All chat messages are encrypted directly in the browser before transmission; servers and intermediate proxies only relay and store opaque ciphertext and initialization vectors (`iv`), making messages completely unreadable to the backend.
-- **Offline Peer-to-Peer Mesh Networking Mode**:
-  Built-in WebRTC `RTCDataChannel` mesh topology. While the server acts as an initial signaling broker, connected peers establish direct browser-to-browser data links. If the central server drops or the Wi-Fi AP fails, mesh peers continue exchanging messages directly.
-- **MySQL Ephemeral Data Layer**:
-  Containerized with MySQL 8.0 to manage active peer presence and zero-knowledge encrypted message caches with zero user identity or IP logging.
-- **On-Device Offline AI Emergency Intelligence**:
-  Offline natural language triage engine supporting multilingual emergency keywords (English, Hindi, Hinglish), urgency modifiers, priority classification (SOS / Medical / Rations / Shelter), and real-time situational report summarization for rescue teams.
-- **Docker Compose Containerization**:
-  Packaged with a multi-container Docker Compose setup (`web` and `db`) for reproducible one-command deployment.
+MistRoom is an offline-capable, privacy-first emergency communication application designed for disaster relief, crisis zones, and local network mesh messaging. It requires zero cloud access, no user accounts, and enforces a strict zero-logging design.
 
 ---
 
-## 🚀 Quick Start
+## 📁 Clean Directory Architecture
 
-### Option 1: Docker Compose (Recommended)
+```
+d:\1PROJECTS\MistRoom/
+├── backend/
+│   └── server.py         # FastAPI WebSocket relay, WebRTC signaling, MySQL layer & offline triage
+├── frontend/
+│   ├── index.html        # Clean, accessible UI with passkey setup, radar & emergency badges
+│   ├── style.css         # Modern dark & light responsive CSS design system
+│   └── app.js            # WebCrypto AES-256 E2EE, WebRTC RTCDataChannel mesh & client triage
+├── docker-compose.yml    # Multi-container orchestration (FastAPI + MySQL 8.0)
+├── Dockerfile            # Container build for backend & static frontend
+├── init.sql              # MySQL zero-logging ephemeral tables
+├── requirements.txt      # Python dependencies
+└── README.md
+```
 
-Run the full stack (FastAPI backend + MySQL 8.0 database) with a single command:
+---
 
+## 🌟 Key Architecture & Features
+
+1. **Client-Side E2EE (AES-256-GCM + PBKDF2)**:
+   All messages are encrypted directly in the browser via the native Web Crypto API (`window.crypto.subtle`) using 100,000 PBKDF2 iterations. Central servers and network sniffers only see opaque Base64 ciphertext and IV.
+
+2. **Zero-Logging Ephemeral MySQL Data Layer**:
+   Stores active peer sessions and zero-knowledge ciphertext caches. Zero user identities, zero IP addresses, and zero plaintext are ever recorded. If MySQL is offline, the backend runs in resilient in-memory mode automatically.
+
+3. **Offline Peer-to-Peer Mesh (WebRTC `RTCDataChannel`)**:
+   Peers automatically establish browser-to-browser P2P data channels (`mistmesh`). If the central server drops, connected peers continue chatting uninterrupted.
+
+4. **Offline Multilingual AI Triage Engine**:
+   Rule-based disaster triage engine parsing English, Hindi, and Hinglish for SOS, Medical, Water/Food, and Shelter needs with severity scoring (0–3) and situational report (SitRep) generation.
+
+---
+
+## 🚀 How to Run
+
+### Option 1: Standalone Python
+```bash
+pip install -r requirements.txt
+python -m backend.server
+```
+Open [http://localhost:3000](http://localhost:3000) on your laptop. Other devices on the same Wi-Fi or mobile hotspot can connect via your LAN IP or by scanning the displayed QR code.
+
+### Option 2: Docker Compose (Full Stack with MySQL)
 ```bash
 docker compose up --build
 ```
-Open [http://localhost:3000](http://localhost:3000) on the host machine.
-
----
-
-### Option 2: Standalone Local Run (Pure Python)
-
-MistRoom includes automated graceful fallback to in-memory mode if MySQL is not running locally:
-
-```bash
-pip install -r requirements.txt
-python server.py
-```
-Open [http://localhost:3000](http://localhost:3000). Other devices on the same Wi-Fi / hotspot can join using the LAN IP address or the displayed QR code.
-
----
-
-## 📁 Project Structure
-
-- `server.py`: FastAPI backend, WebSocket relay, WebRTC signaling hub, and async MySQL connector.
-- `ai.py`: Offline rule-based NLP triage and situation report generator.
-- `init.sql`: MySQL database schema for rooms, active peer sessions, and encrypted caches.
-- `Dockerfile` & `docker-compose.yml`: Containerization setup for app and MySQL services.
-- `public/`:
-  - `index.html`: Responsive chat interface, E2EE passkey modal, peer radar, and privacy status badges.
-  - `app.js`: Web Crypto API E2EE engine, WebRTC DataChannel mesh manager, and client-side triage.
-  - `manifest.json`: Web app manifest for PWA installation.
+Open [http://localhost:3000](http://localhost:3000).

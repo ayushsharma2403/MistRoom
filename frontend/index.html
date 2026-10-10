@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F172A">
+<title>MistRoom – Anonymous Mesh Chat</title>
+<link rel="stylesheet" href="style.css?v=1.0">
+</head>
+<body>
+
+<!-- 1. JOIN MODAL (Full interactive passkey & nickname setup) -->
+<div id="join-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-icon">🛡️</div>
+      <h1>MistRoom</h1>
+      <p>Privacy-First Anonymous Chat & Emergency Mesh</p>
+    </div>
+
+    <form id="join-form" onsubmit="return false;">
+      <div class="form-group">
+        <label for="nickname-input">Your Nickname</label>
+        <input 
+          id="nickname-input" 
+          type="text" 
+          placeholder="e.g. Scout-1" 
+          maxlength="20" 
+          autocomplete="off" 
+          autofocus 
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="passkey-input">Room Passkey (AES-256 E2EE)</label>
+        <div class="input-with-action">
+          <input 
+            id="passkey-input" 
+            type="text" 
+            placeholder="Room secret passkey" 
+            value="mistroom-safe" 
+            autocomplete="off" 
+            required
+          />
+          <button type="button" id="toggle-eye" class="icon-btn" title="Toggle Visibility">👁️</button>
+        </div>
+      </div>
+
+      <div class="info-banner">
+        🔒 <b>Zero-Logging E2EE:</b> All messages are encrypted with AES-256-GCM before leaving your browser. The server and relay logs never see plaintext or private data.
+      </div>
+
+      <button type="button" id="join-btn" class="btn-primary">Join Secure Room</button>
+
+      <div class="qr-container">
+        <p class="qr-label">📱 Scan on Wi-Fi or Hotspot:</p>
+        <div class="qr-box">
+          <img src="/qr.svg" alt="Scan to join from mobile device" />
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 2. MAIN APPLICATION -->
+<div class="app-layout">
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="app-brand" id="brand-logo" title="Triple tap to wipe credentials">
+        <span class="brand-name">Mist<i>Room</i></span>
+      </div>
+      <div class="security-badges">
+        <span class="badge badge-e2ee">🔒 AES-256-GCM</span>
+        <span class="badge badge-mesh" id="mesh-counter">⚡ Mesh: 0 P2P</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button type="button" id="toggle-peers-btn" class="btn-secondary">Peers (<span id="peer-count">0</span>)</button>
+      <div class="status-indicator">
+        <span class="status-dot" id="status-dot"></span>
+        <span class="status-text" id="status-text">Connecting...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Pinned Emergency Alert (SOS) -->
+  <div id="sos-banner" class="sos-banner" style="display:none;"></div>
+
+  <!-- Chat & Sidebar Area -->
+  <div class="main-body">
+    <!-- Chat Stream -->
+    <main class="chat-container">
+      <div id="messages-list" class="messages-list" role="log" aria-live="polite"></div>
+
+      <!-- Message Input Form -->
+      <footer class="composer-container">
+        <form id="composer-form">
+          <input 
+            id="message-input" 
+            type="text" 
+            placeholder="Type end-to-end encrypted message..." 
+            autocomplete="off" 
+            maxlength="500" 
+          />
+          <button type="button" id="gps-btn" class="btn-tool" title="Attach GPS Location">📍 GPS</button>
+          <button type="submit" id="send-btn" class="btn-send">Send</button>
+          <button type="button" id="sos-btn" class="btn-sos">🚨 SOS</button>
+        </form>
+      </footer>
+    </main>
+
+    <!-- Right Sidebar (Peers Radar & SitRep) -->
+    <aside class="sidebar" id="peers-sidebar">
+      <div class="sidebar-section">
+        <h3>Nearby Peer Radar</h3>
+        <div class="radar-circle" id="radar-display"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <h3>Connected Peers</h3>
+        <ul id="peers-list" class="peer-items"></ul>
+      </div>
+
+      <div class="sidebar-section footer-action">
+        <button type="button" id="sitrep-btn" class="btn-sitrep">📊 Emergency SitRep</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="app.js?v=4.0"></script>
+</body>
+</html>
