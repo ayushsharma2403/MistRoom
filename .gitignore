@@ -7,3 +7,8 @@ env/
 venv/
 *.log
 .DS_Store
+
+# Local session resumption & decision log (never push to git)
+STATE.md
+SESSION_STATE.md
+local_session/
