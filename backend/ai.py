@@ -1,13 +1,70 @@
-"""MistRoom Offline AI Engine: Emergency Triage, Priority Scoring & Situation Reports.
-Pure Python, offline execution, zero external API keys needed.
-Supports English, Hindi, and Hinglish disaster vocabulary.
+"""MistRoom Offline AI Engine: Emergency Triage, Women's Safety, Threat Prevention & Vital Extraction.
+Pure Python, 100% offline execution, zero external API keys required.
+Supports English, Hindi, and Hinglish disaster & emergency vocabulary.
 """
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 import re
 
-# Emergency rule definitions: (Category, Priority [1-3], Keyword list)
+# -------------------------------------------------------------
+# 1. PROHIBITED THREAT & ABUSE RULES
+# MistRoom is built strictly for civil society, women's safety, students,
+# disaster victims, and emergency personnel.
+# Prohibits terrorism, riot incitement, Naxalite violence, cyber theft/malware.
+# -------------------------------------------------------------
+PROHIBITED_THREAT_RULES: List[Tuple[str, List[str]]] = [
+    (
+        "terrorism_extremism",
+        [
+            "bomb blast", "ied", "detonator", "r規範dx", "suicide vest",
+            "jihadist attack", "terror attack", "target killing", "assassination plot",
+            "recruit for terror", "plant explosives", "bomb banana", "blast karenge",
+            "fidayeen", "weapon drop", "terrorist cell"
+        ]
+    ),
+    (
+        "riot_communal_violence",
+        [
+            "danga karo", "dange bhadkao", "aag laga do", "burn their houses", "lynch them",
+            "stone pelting", "pattharbaazi", "attack the temple", "attack the mosque",
+            "communal clash", "bring petrol bombs", "molo tov", "looting start",
+            "riot mobilization", "gather weapons for riot", "maro unko"
+        ]
+    ),
+    (
+        "naxalite_insurgency",
+        [
+            "naxalite attack", "ambush police", "crpf ambush", "red corridor strike",
+            "blow railway track", "overthrow government by arms", "naxali strike",
+            "guerrilla ambush", "landmine ambush"
+        ]
+    ),
+    (
+        "cyber_theft_malware",
+        [
+            "ransomware decryptor", "rat payload", "atm skimmer", "card dumps",
+            "stolen creds", "ddos tool", "buy hacked db", "bank otp bypass",
+            "phishing kit", "sim swap tool", "malware injector", "steal aadhaar database"
+        ]
+    )
+]
+
+# -------------------------------------------------------------
+# 2. EMERGENCY & WOMEN'S SAFETY RULE DEFINITIONS
+# -------------------------------------------------------------
 RULES: List[Tuple[str, int, List[str]]] = [
-    # SOS & Immediate Life Threat (Prio 3)
+    # Women's Safety & Anti-Harassment (Prio 3)
+    (
+        "women_safety",
+        3,
+        [
+            "following me", "stalking", "stalker", "harassment", "unsafe", "molested",
+            "cab driver wrong route", "cornered", "alone in dark", "trying to grab me",
+            "chhedchhad", "pichha kar raha", "koi pichhe pada hai", "dara raha hai",
+            "galat jagah le ja raha", "akeli hoon", "bachao koi", "unsafe feeling",
+            "forcefully pulling", "eve teasing", "emergency women", "#safe", "#helpme"
+        ]
+    ),
+    # Immediate Life Threat & Disaster SOS (Prio 3)
     (
         "sos",
         3,
@@ -15,8 +72,8 @@ RULES: List[Tuple[str, int, List[str]]] = [
             "sos", "help", "help me", "emergency", "trapped", "drowning", "fire",
             "collapsed", "attack", "dying", "danger", "khatra", "madad", "bachao",
             "bachaao", "aag", "phans gaye", "phas gaya", "doob", "emergency call",
-            "save us", "need rescue", "send help"
-        ],
+            "save us", "need rescue", "send help", "landslide trapped"
+        ]
     ),
     # Medical Emergencies & Critical Injuries (Prio 2)
     (
@@ -27,8 +84,8 @@ RULES: List[Tuple[str, int, List[str]]] = [
             "fracture", "pain", "medicine", "doctor", "ambulance", "pregnant",
             "delivery", "insulin", "breathing", "asthma", "heart attack", "stroke",
             "burn", "dawai", "ghayal", "chot", "khoon", "dard", "saans", "behosh",
-            "bimari", "medic"
-        ],
+            "bimari", "medic", "blood needed", "snake bite"
+        ]
     ),
     # Essential Supplies: Water, Food & Infant Needs (Prio 1)
     (
@@ -38,7 +95,7 @@ RULES: List[Tuple[str, int, List[str]]] = [
             "water", "clean water", "drinking water", "food", "ration", "hungry",
             "starving", "thirsty", "milk", "baby food", "infant", "paani", "khana",
             "bhook", "bhookh", "pyaas", "doodh", "bache ke liye"
-        ],
+        ]
     ),
     # Evacuation & Shelter Requirements (Prio 1)
     (
@@ -48,23 +105,98 @@ RULES: List[Tuple[str, int, List[str]]] = [
             "shelter", "roof", "blanket", "tarp", "cold", "hypothermia", "stuck",
             "road blocked", "evacuate", "landslide", "flood", "safe place", "ghar",
             "rescue camp", "chhat", "sardi", "thand", "rasta band", "sharan"
-        ],
-    ),
+        ]
+    )
 ]
 
 URGENCY_MODIFIERS = [
     "urgent", "immediately", "right now", "jaldi", "turant", "critical",
-    "asap", "can't breathe", "failing", "severe"
+    "asap", "can't breathe", "failing", "severe", "life threat"
 ]
 
+# -------------------------------------------------------------
+# 3. DISASTER VITALS EXTRACTION (Regex & NLP Parsing)
+# -------------------------------------------------------------
+def extract_vitals(text: str) -> Dict:
+    """Extract actionable medical, casualty, and logistical signals from text."""
+    vitals = {
+        "victims_count": None,
+        "blood_type": None,
+        "urgency": "normal",
+        "has_location_hint": False
+    }
+    t = (text or "").lower()
 
-def triage(text: str) -> Tuple[str, int]:
-    """Analyze emergency message text and return (category, priority 0-3).
-    
-    Category: 'sos' | 'medical' | 'water' | 'shelter' | 'general'
-    Priority: 0 (Routine) to 3 (Immediate Life Threat)
+    # 1. Victim count extraction (e.g., '4 people trapped', '2 injured', '3 log phanse')
+    victim_match = re.search(r'(\d+)\s*(people|persons|victims|injured|trapped|log|bachhe|women)', t)
+    if victim_match:
+        try:
+            vitals["victims_count"] = int(victim_match.group(1))
+        except ValueError:
+            pass
+
+    # 2. Blood group extraction (e.g., 'O+', 'A-', 'AB+', 'B positive')
+    blood_match = re.search(r'\b(ab|a|b|o)\s*(\+|\-|positive|negative)?(?:\s+blood)?', t, re.IGNORECASE)
+    if blood_match and (blood_match.group(2) or "blood" in blood_match.group(0)):
+        grp = blood_match.group(1).upper()
+        sign = (blood_match.group(2) or "+").lower()
+        sign_str = "-" if ("-" in sign or "neg" in sign) else "+"
+        vitals["blood_type"] = f"{grp}{sign_str}"
+
+    # 3. Urgency tag
+    if any(m in t for m in URGENCY_MODIFIERS):
+        vitals["urgency"] = "critical"
+
+    # 4. Location coordinates or street hint
+    if re.search(r'(near|at|opposite|road|floor|gali|chowk|sector|lat|long|gps)', t):
+        vitals["has_location_hint"] = True
+
+    return vitals
+
+
+# -------------------------------------------------------------
+# 4. COMPREHENSIVE TRIAGE & SAFETY INSPECTION
+# -------------------------------------------------------------
+def inspect_threat(text: str) -> Tuple[bool, Optional[str]]:
+    """Inspect text against prohibited threat vectors.
+    Returns (is_threat, threat_reason).
     """
     t = (text or "").lower()
+    for category, words in PROHIBITED_THREAT_RULES:
+        for w in words:
+            if re.search(r'\b' + re.escape(w) + r'\b', t) or w in t:
+                return True, category
+    return False, None
+
+
+def triage(text: str) -> Dict:
+    """Analyze emergency message text and return structured intelligence dictionary.
+    
+    Returns:
+    {
+        "cat": 'women_safety' | 'sos' | 'medical' | 'water' | 'shelter' | 'general',
+        "prio": 0-3,
+        "is_threat": bool,
+        "threat_reason": Optional[str],
+        "vitals": Dict,
+        "is_women_safety": bool
+    }
+    """
+    t = (text or "").lower()
+
+    # Step 1: Check for prohibited threat violation
+    is_threat, threat_reason = inspect_threat(text)
+    if is_threat:
+        return {
+            "cat": "blocked_threat",
+            "prio": 0,
+            "is_threat": True,
+            "threat_reason": threat_reason,
+            "vitals": {},
+            "is_women_safety": False
+        }
+
+    # Step 2: Match disaster & safety rules
     best = ("general", 0, 0)  # category, priority, match_count
 
     for cat, prio, words in RULES:
@@ -75,7 +207,7 @@ def triage(text: str) -> Tuple[str, int]:
 
     cat, prio, _ = best
 
-    # Urgency & punctuation analysis
+    # Urgency & punctuation escalation
     has_urgency_word = any(mod in t for mod in URGENCY_MODIFIERS)
     has_exclamation = ("!" in text or "?!" in text)
     is_caps = len(text) > 4 and text.isupper()
@@ -83,37 +215,15 @@ def triage(text: str) -> Tuple[str, int]:
     if (has_urgency_word or has_exclamation or is_caps) and 0 < prio < 3:
         prio += 1
 
-    return cat, prio
+    # Extract actionable vitals
+    vitals = extract_vitals(text)
+    is_women_safety = (cat == "women_safety")
 
-
-def summarize(msgs: List[Dict]) -> str:
-    """Generate crisis situation report (SitRep) for emergency responders and peer units."""
-    if not msgs:
-        return "No emergency messages recorded in this emergency cluster."
-
-    count = lambda c: sum(1 for m in msgs if m.get("cat") == c)
-    unique_senders = len({m.get("from") or m.get("sender") for m in msgs})
-
-    sos_count = count("sos")
-    med_count = count("medical")
-    water_count = count("water")
-    shelter_count = count("shelter")
-
-    report_lines = [
-        f"[SITUATION REPORT] {len(msgs)} messages from {unique_senders} active peer(s).",
-        f"Priority Breakdown -> SOS: {sos_count} | Medical: {med_count} | Water/Food: {water_count} | Shelter: {shelter_count}."
-    ]
-
-    # Collect latest high-priority incidents (prio >= 2)
-    urgent = [m for m in msgs if m.get("prio", 0) >= 2][-3:]
-    if urgent:
-        snippets = []
-        for m in urgent:
-            sender = m.get("from") or m.get("sender") or "Peer"
-            txt = m.get("text") or "[E2EE Protected Message]"
-            snippets.append(f"{sender}: \"{txt[:50]}\"")
-        report_lines.append(f"[Recent Critical] {' | '.join(snippets)}")
-    else:
-        report_lines.append("[Status] No critical priority alerts currently active.")
-
-    return "\n".join(report_lines)
+    return {
+        "cat": cat,
+        "prio": prio,
+        "is_threat": False,
+        "threat_reason": None,
+        "vitals": vitals,
+        "is_women_safety": is_women_safety
+    }
