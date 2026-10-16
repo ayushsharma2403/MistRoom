@@ -36,8 +36,8 @@ d:\1PROJECTS\MistRoom/
 3. **Offline Peer-to-Peer Mesh (WebRTC `RTCDataChannel`)**:
    Peers automatically establish browser-to-browser P2P data channels (`mistmesh`). If the central server drops, connected peers continue chatting uninterrupted.
 
-4. **Offline Multilingual AI Triage Engine**:
-   Rule-based disaster triage engine parsing English, Hindi, and Hinglish for SOS, Medical, Water/Food, and Shelter needs with severity scoring (0–3) and situational report (SitRep) generation.
+4. **Intelligent Multilingual AI Triage & SitRep Engine**:
+   Integrated dual-mode triage pipeline with Google Gemini AI and offline rule-based fallbacks for English, Hindi, and Hinglish. Automatically parses SOS, Medical, Logistics, and Safety priorities, computing real-time severity scoring (0–3) and emergency situational reports.
 
 ---
 
