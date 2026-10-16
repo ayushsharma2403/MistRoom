@@ -23,17 +23,14 @@ except ImportError:
     segno = None
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # -------------------------------------------------------------
-# 1. OFFLINE NLP EMERGENCY TRIAGE & SITREP ENGINE (ai.py)
+# 1. OFFLINE NLP EMERGENCY TRIAGE ENGINE (ai.py)
 # -------------------------------------------------------------
-try:
-    from backend.ai import triage as triage_message, summarize as generate_sitrep, RULES as TRIAGE_RULES
-except ImportError:
-    from ai import triage as triage_message, summarize as generate_sitrep, RULES as TRIAGE_RULES
+from backend.ai import triage as triage_message, RULES as TRIAGE_RULES
 
 # -------------------------------------------------------------
 # 2. CONFIGURATION & DATABASE LAYER
@@ -172,22 +169,41 @@ async def broadcast_json(payload: dict, exclude: Optional[WebSocket] = None):
             await send_json(ws, payload)
 
 async def broadcast_peers():
-    peers = [{"name": c["name"], "peer_id": c["peer_id"]} for c in clients.values() if c.get("name")]
-    await broadcast_json({"t": "people", "people": peers})
+    for ws_client, c in list(clients.items()):
+        current_room = c.get("room", "global")
+        # List all peers in the mesh with their current rooms
+        all_rooms = list({cl.get("room", "global") for cl in clients.values() if cl.get("name")})
+        room_peers = [
+            {"name": other["name"], "peer_id": other["peer_id"], "room": other.get("room", "global")}
+            for other in clients.values() if other.get("name") and other.get("room", "global") == current_room
+        ]
+        await send_json(ws_client, {
+            "t": "people",
+            "people": room_peers,
+            "room": current_room,
+            "available_rooms": all_rooms
+        })
 
 # -------------------------------------------------------------
 # 5. REST & QR ROUTES
 # -------------------------------------------------------------
 @app.get("/qr.svg")
-def get_qr_svg():
+def get_qr_svg(request: Request):
+    host_header = request.headers.get("host")
+    if host_header:
+        scheme = request.url.scheme or "http"
+        target_url = f"{scheme}://{host_header}"
+    else:
+        target_url = LAN_URL
+
     if segno:
         buf = io.BytesIO()
-        segno.make(LAN_URL).save(buf, kind="svg", scale=6, border=1)
+        segno.make(target_url).save(buf, kind="svg", scale=6, border=1)
         return Response(buf.getvalue(), media_type="image/svg+xml")
     svg_fallback = f'''<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
         <rect width="100%" height="100%" fill="#eee"/>
-        <text x="50%" y="45%" text-anchor="middle" font-size="12" fill="#333" font-family="sans-serif">Scan on Wi-Fi:</text>
-        <text x="50%" y="60%" text-anchor="middle" font-size="10" fill="#2F7F86" font-family="sans-serif">{LAN_URL}</text>
+        <text x="50%" y="45%" text-anchor="middle" font-size="12" fill="#333" font-family="sans-serif">Connect on Wi-Fi:</text>
+        <text x="50%" y="60%" text-anchor="middle" font-size="10" fill="#2F7F86" font-family="sans-serif">{target_url}</text>
     </svg>'''
     return Response(svg_fallback, media_type="image/svg+xml")
 
@@ -229,12 +245,23 @@ async def websocket_endpoint(ws: WebSocket):
             if event_type == "join":
                 nickname = str(msg_data.get("name") or "guest").strip()[:20] or "guest"
                 pid = str(msg_data.get("peer_id") or temp_peer_id)
+                room_id = str(msg_data.get("room") or "global").strip()[:30] or "global"
                 clients[ws]["name"] = nickname
                 clients[ws]["peer_id"] = pid
+                clients[ws]["room"] = room_id
 
                 await db_save_peer(pid, nickname)
-                # Send history and active peer list
-                await send_json(ws, {"t": "history", "history": list(history), "peer_id": pid})
+                # Send history and active peer list filtered by room
+                room_history = [m for m in history if m.get("room", "global") == room_id]
+                await send_json(ws, {"t": "history", "history": room_history, "peer_id": pid, "room": room_id})
+                await broadcast_peers()
+
+            # A2. Switch or create room
+            elif event_type == "switch_room":
+                new_room = str(msg_data.get("room") or "global").strip()[:30] or "global"
+                clients[ws]["room"] = new_room
+                room_history = [m for m in history if m.get("room", "global") == new_room]
+                await send_json(ws, {"t": "history", "history": room_history, "peer_id": clients[ws]["peer_id"], "room": new_room})
                 await broadcast_peers()
 
             # B. Zero-knowledge message relay
@@ -251,15 +278,32 @@ async def websocket_endpoint(ws: WebSocket):
                 # Use client pre-triaged emergency category if encrypted, otherwise run triage
                 if msg_data.get("cat") and msg_data.get("prio") is not None:
                     cat, prio = msg_data["cat"], int(msg_data["prio"])
+                    is_threat = False
                 elif plaintext:
-                    cat, prio = ("sos", 3) if msg_data.get("sos") else triage_message(plaintext)
+                    if msg_data.get("sos"):
+                        cat, prio, is_threat = "sos", 3, False
+                    else:
+                        t_res = triage_message(plaintext)
+                        cat, prio, is_threat = t_res["cat"], t_res["prio"], t_res["is_threat"]
                 else:
-                    cat, prio = ("general", 0)
+                    cat, prio, is_threat = ("general", 0, False)
+
+                # Drop prohibited threats (terrorism, riots, cyber theft) immediately
+                if is_threat:
+                    await send_json(ws, {
+                        "t": "error",
+                        "text": "Message blocked by MistRoom Safety Engine: Content violates community safety standards."
+                    })
+                    continue
+
+                room_id = clients[ws].get("room", "global")
+                target_dm_peer = msg_data.get("target_peer")
 
                 record = {
                     "id": mid,
                     "from": clients[ws]["name"],
                     "peer_id": clients[ws]["peer_id"],
+                    "room": room_id,
                     "text": plaintext,       # Empty in strict E2EE mode
                     "ciphertext": ciphertext,
                     "iv": iv,
@@ -268,27 +312,61 @@ async def websocket_endpoint(ws: WebSocket):
                     "ts": int(time.time() * 1000)
                 }
 
+                if target_dm_peer:
+                    record["target_peer"] = target_dm_peer
+                    record["is_dm"] = True
+
                 history.append(record)
                 asyncio.create_task(db_save_message(mid, clients[ws]["name"], ciphertext or plaintext, iv, cat, prio))
-                await broadcast_json({"t": "msg", "msg": record})
 
-            # C. WebRTC P2P Mesh Signaling (Offer, Answer, ICE candidates)
-            elif event_type in ("webrtc_offer", "webrtc_answer", "webrtc_ice"):
+                if target_dm_peer:
+                    # Deliver only to sender and targeted recipient
+                    for client_ws, client_info in list(clients.items()):
+                        if client_info.get("peer_id") in (target_dm_peer, clients[ws]["peer_id"]):
+                            await send_json(client_ws, {"t": "msg", "msg": record})
+                else:
+                    # Broadcast to clients in this room (or broadcast SOS globally if priority 3)
+                    for client_ws, client_info in list(clients.items()):
+                        if client_info.get("room") == room_id or (prio == 3 and msg_data.get("sos")):
+                            await send_json(client_ws, {"t": "msg", "msg": record})
+
+            # B2. Message Delivery Receipt / Acknowledgement
+            elif event_type == "msg_ack":
+                ack_mid = msg_data.get("id")
+                target_sender = msg_data.get("target_peer")
+                if ack_mid and target_sender:
+                    for client_ws, client_info in list(clients.items()):
+                        if client_info.get("peer_id") == target_sender:
+                            await send_json(client_ws, {
+                                "t": "msg_ack",
+                                "id": ack_mid,
+                                "from_peer": clients[ws]["peer_id"],
+                                "status": msg_data.get("status", "delivered")
+                            })
+
+            # C. WebRTC P2P Mesh & Call Signaling (Offer, Answer, ICE, File Chunks, Voice/Video Calls)
+            elif event_type in ("webrtc_offer", "webrtc_answer", "webrtc_ice", "p2p_file", "call_invite", "call_accept", "call_decline", "call_hangup", "call_ice"):
                 target_peer = msg_data.get("target")
-                for target_ws, info in clients.items():
-                    if info.get("peer_id") == target_peer:
-                        await send_json(target_ws, {
-                            "t": event_type,
-                            "sender": clients[ws]["peer_id"],
-                            "sender_name": clients[ws]["name"],
-                            "data": msg_data.get("data")
-                        })
-                        break
-
-            # D. Crisis Situation Report
-            elif event_type == "summary":
-                report = generate_sitrep(list(history))
-                await send_json(ws, {"t": "summary", "text": report})
+                if target_peer:
+                    for target_ws, info in clients.items():
+                        if info.get("peer_id") == target_peer:
+                            await send_json(target_ws, {
+                                "t": event_type,
+                                "sender": clients[ws]["peer_id"],
+                                "sender_name": clients[ws]["name"],
+                                "data": msg_data.get("data")
+                            })
+                            break
+                elif event_type == "p2p_file":
+                    # Broadcast file to current room peers
+                    for target_ws, info in clients.items():
+                        if target_ws != ws and info.get("room") == room_id:
+                            await send_json(target_ws, {
+                                "t": "p2p_file",
+                                "sender": clients[ws]["peer_id"],
+                                "sender_name": clients[ws]["name"],
+                                "data": msg_data.get("data")
+                            })
 
     except WebSocketDisconnect:
         pass
