@@ -12,3 +12,8 @@ venv/
 STATE.md
 SESSION_STATE.md
 local_session/
+
+# IDE & OS temporary artifacts
+.vscode/
+.idea/
+Thumbs.db
