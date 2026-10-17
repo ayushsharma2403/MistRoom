@@ -1,6 +1,8 @@
 /**
  * Shared frontend application state for MistRoom.
  */
+const safeGetItem = key => (typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null);
+
 export const state = {
   ws: null,
   currentNickname: '',
@@ -15,10 +17,10 @@ export const state = {
   allDiscoveredRooms: ['global'],
   currentPeersList: [],
   forwardedMessageIds: new Set(),
-  blockedPeerIds: new Set(JSON.parse(localStorage.getItem('mistroom_blocked_peers') || '[]')),
-  blockedPeersMap: new Map(JSON.parse(localStorage.getItem('mistroom_blocked_peers_map') || '[]')), // peerId -> handle
-  isStealthMode: localStorage.getItem('mistroom_stealth') === 'true',
-  customIceServers: localStorage.getItem('mistroom_custom_ice') || '',
+  blockedPeerIds: new Set(JSON.parse(safeGetItem('mistroom_blocked_peers') || '[]')),
+  blockedPeersMap: new Map(JSON.parse(safeGetItem('mistroom_blocked_peers_map') || '[]')), // peerId -> handle
+  isStealthMode: safeGetItem('mistroom_stealth') === 'true',
+  customIceServers: safeGetItem('mistroom_custom_ice') || '',
   activeIncomingFiles: new Map(),
   activeCallPeerConnection: null,
   localMediaStream: null,
@@ -29,9 +31,9 @@ export const state = {
   pendingCallIceCandidates: [], // Buffer for ICE candidates arriving before PC ready
   dbInstance: null,
   activeBeacons: new Map(), // beaconId -> beaconRecord
-  beaconConsent: localStorage.getItem('mistroom_beacon_consent'), // 'beacon' | 'room_only' | null
+  beaconConsent: safeGetItem('mistroom_beacon_consent'), // 'beacon' | 'room_only' | null
   messageAcks: new Map(), // msgId -> Set of peerIds who acked
   openNeeds: new Map() // msgId -> needRecord
 };
 
-export const $ = id => document.getElementById(id);
+export const $ = id => (typeof document !== 'undefined' ? document.getElementById(id) : null);

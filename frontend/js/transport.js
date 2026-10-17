@@ -250,10 +250,8 @@ export class Router {
   }
 }
 
-import { BleTransport } from './ble/transport_ble.js';
-
 // Global router singleton
 export const router = new Router();
 router.registerTransport(new WsTransport());
 router.registerTransport(new RtcTransport());
-router.registerTransport(new BleTransport());
+

@@ -1,13 +1,94 @@
 package org.mistroom.app.ble
 
+import android.app.*
 import android.bluetooth.*
 import android.bluetooth.le.*
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.os.IBinder
 import android.os.ParcelUuid
+import android.os.SystemClock
 import android.util.Base64
+import androidx.core.app.NotificationCompat
 import com.getcapacitor.*
 import com.getcapacitor.annotation.CapacitorPlugin
 import java.util.*
+
+/**
+ * Android Foreground Service maintaining persistent Bluetooth mesh operations
+ * and displaying the required sticky notification "MistRoom mesh is running".
+ */
+class MistMeshForegroundService : Service() {
+
+    companion object {
+        const val CHANNEL_ID = "mistroom_mesh_service_channel"
+        const val NOTIFICATION_ID = 1001
+
+        fun startService(context: Context) {
+            val intent = Intent(context, MistMeshForegroundService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun stopService(context: Context) {
+            val intent = Intent(context, MistMeshForegroundService::class.java)
+            context.stopService(intent)
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("MistRoom")
+            .setContentText("MistRoom mesh is running")
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+
+        startForeground(NOTIFICATION_ID, notification)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return START_STICKY
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "MistRoom Mesh Service",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Keeps MistRoom peer-to-peer BLE mesh active in the background"
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
+    }
+}
+
+/**
+ * Receiver for Exact Alarms scheduled via AlarmManager for Safe-walk expiry
+ */
+class MistAlarmReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val payload = intent.getStringExtra("actionPayload") ?: "{}"
+        val broadcastIntent = Intent("org.mistroom.app.SAFEWALK_ALARM_FIRED").apply {
+            putExtra("payload", payload)
+            setPackage(context.packageName)
+        }
+        context.sendBroadcast(broadcastIntent)
+    }
+}
 
 @CapacitorPlugin(name = "MistBlePeripheral")
 class MistBlePeripheralPlugin : Plugin() {
@@ -36,16 +117,30 @@ class MistBlePeripheralPlugin : Plugin() {
             return
         }
 
+        // Start Android foreground service with persistent notification
+        MistMeshForegroundService.startService(context)
+
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(true)
             .build()
 
+        // 4-byte rotating random tag in manufacturer or service data
+        val tagB64 = call.getString("data")
+        val tagBytes = if (!tagB64.isNullOrEmpty()) {
+            Base64.decode(tagB64, Base64.NO_WRAP)
+        } else {
+            val b = ByteArray(4)
+            Random().nextBytes(b)
+            b
+        }
+
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
             .addServiceUuid(ParcelUuid(SERVICE_UUID))
+            .addServiceData(ParcelUuid(SERVICE_UUID), tagBytes)
             .build()
 
         bleAdvertiser?.startAdvertising(settings, data, object : AdvertiseCallback() {
@@ -66,6 +161,9 @@ class MistBlePeripheralPlugin : Plugin() {
         gattServer?.close()
         gattServer = null
         connectedDevices.clear()
+
+        // Stop foreground service
+        MistMeshForegroundService.stopService(context)
         call.resolve()
     }
 
@@ -131,5 +229,54 @@ class MistBlePeripheralPlugin : Plugin() {
         } else {
             call.reject("Notification characteristic not ready")
         }
+    }
+
+    /**
+     * Requirement 7: Expose native AlarmManager exact alarm for Safe-walk timer
+     */
+    @PluginMethod
+    fun scheduleExactAlarm(call: PluginCall) {
+        val delaySeconds = call.getInt("delaySeconds") ?: 60
+        val payload = call.getString("actionPayload") ?: "{}"
+
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+        if (alarmManager == null) {
+            call.reject("AlarmManager unavailable")
+            return
+        }
+
+        val intent = Intent(context, MistAlarmReceiver::class.java).apply {
+            putExtra("actionPayload", payload)
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            4001,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val triggerTime = SystemClock.elapsedRealtime() + (delaySeconds * 1000L)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerTime, pendingIntent)
+        } else {
+            alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerTime, pendingIntent)
+        }
+
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun cancelExactAlarm(call: PluginCall) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+        val intent = Intent(context, MistAlarmReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            4001,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager?.cancel(pendingIntent)
+        call.resolve()
     }
 }

@@ -296,6 +296,101 @@ export function renderMeshTopology() {
     li.textContent = `🔗 ${pId.substring(0, 8)}... • ${isOpen ? 'P2P WebRTC (1-hop)' : 'Relay Hub (2-hop)'}`;
     list.append(li);
   }
+
+  renderBleNeighbors();
+}
+
+export function renderBleNeighbors(bleTransport = null) {
+  const list = $('ble-neighbors-list');
+  const countEl = $('ble-topo-count');
+  if (!list) return;
+
+  const ble = bleTransport || state.bleTransport;
+  if (!ble || !ble.neighbors) {
+    list.innerHTML = '';
+    const empty = document.createElement('li');
+    empty.style.fontSize = '12px';
+    empty.style.color = 'var(--text-muted)';
+    empty.style.padding = '6px 8px';
+    empty.textContent = 'BLE transport inactive.';
+    list.append(empty);
+    if (countEl) countEl.textContent = '0 BLE';
+    return;
+  }
+
+  const neighbors = Array.from(ble.neighbors.values());
+  if (countEl) countEl.textContent = `${neighbors.length} BLE`;
+
+  list.innerHTML = '';
+  if (neighbors.length === 0) {
+    const empty = document.createElement('li');
+    empty.style.fontSize = '12px';
+    empty.style.color = 'var(--text-muted)';
+    empty.style.padding = '6px 8px';
+    empty.textContent = 'Scanning... No BLE neighbors in range.';
+    list.append(empty);
+    return;
+  }
+
+  for (const n of neighbors) {
+    const li = document.createElement('li');
+    li.style.fontSize = '12px';
+    li.style.padding = '8px';
+    li.style.background = 'rgba(59,130,246,0.08)';
+    li.style.border = '1px solid rgba(59,130,246,0.2)';
+    li.style.borderRadius = '6px';
+    li.style.display = 'flex';
+    li.style.justifyContent = 'space-between';
+    li.style.alignItems = 'center';
+
+    const isConnected = ble.connectedDevices.has(n.deviceId);
+    const rssiBars = n.rssi > -65 ? '▂▄▆█ Strong' : n.rssi > -80 ? '▂▄▆_ Good' : '▂___ Weak';
+    const battText = n.pluggedIn ? '⚡ Charging' : `🔋 B${n.battery ?? 3}`;
+
+    const left = document.createElement('div');
+    const title = document.createElement('div');
+    title.style.fontWeight = '600';
+    title.textContent = `📶 ${n.name || n.deviceId.substring(0, 10)} ${isConnected ? '• Connected' : '• In Range'}`;
+    const sub = document.createElement('div');
+    sub.style.fontSize = '11px';
+    sub.style.color = 'var(--text-muted)';
+    sub.textContent = `${rssiBars} (${n.rssi} dBm) • ${battText} • 1-hop`;
+    left.append(title, sub);
+
+    const badge = document.createElement('span');
+    badge.style.fontSize = '10px';
+    badge.style.padding = '2px 6px';
+    badge.style.borderRadius = '4px';
+    badge.style.fontWeight = '700';
+    if (isConnected) {
+      badge.style.background = 'rgba(6,214,160,0.2)';
+      badge.style.color = 'var(--primary)';
+      badge.textContent = 'LINKED';
+    } else {
+      badge.style.background = 'rgba(255,255,255,0.08)';
+      badge.style.color = 'var(--text-muted)';
+      badge.textContent = 'STANDBY';
+    }
+
+    li.append(left, badge);
+    list.append(li);
+  }
+}
+
+export function updateBleHeaderChip(bleTransport = null) {
+  const chip = $('ble-header-chip');
+  if (!chip) return;
+  const ble = bleTransport || state.bleTransport;
+  if (!ble || !ble.capabilities?.available) {
+    chip.textContent = '📶 BLE: Web/Off';
+    chip.style.borderColor = 'rgba(255,255,255,0.1)';
+    chip.style.color = 'var(--text-muted)';
+    return;
+  }
+  const count = ble.connectedDevices?.size || 0;
+  chip.textContent = `📶 BLE: ${count} link${count === 1 ? '' : 's'}`;
+  chip.style.borderColor = count > 0 ? 'rgba(6,214,160,0.4)' : 'rgba(59,130,246,0.3)';
+  chip.style.color = count > 0 ? 'var(--primary)' : '#60a5fa';
 }
 
 export function appendSystemMessage(text) {

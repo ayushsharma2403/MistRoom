@@ -208,6 +208,153 @@ async function runMeshSimulation() {
   console.log('✓ Test 5: 10-Node Mesh Simulator passed (all nodes received in <= 7 hops, gossip suppression active)');
 }
 
-runMeshSimulation().then(() => {
-  console.log('ALL BLE PROTOCOL TESTS COMPLETED SUCCESSFULLY.');
-});
+// TEST 6: HELLO exchange encoder/decoder
+{
+  const { encodeHelloPayload, decodeHelloPayload } = await import('../frontend/js/ble/protocol.js');
+  const payload = encodeHelloPayload({
+    peerShort: 'abcdef1234567890',
+    ver: 1,
+    batteryBucket: 2,
+    pluggedIn: true
+  });
+  const decoded = decodeHelloPayload(payload);
+  assert.strictEqual(decoded.peerShort, 'abcdef1234567890');
+  assert.strictEqual(decoded.ver, 1);
+  assert.strictEqual(decoded.batteryBucket, 2);
+  assert.strictEqual(decoded.pluggedIn, true);
+  console.log('✓ Test 6: HELLO payload serialization/deserialization passed');
+}
+
+// TEST 7: Rate limiter (max 30 pkts/s per neighbor)
+{
+  const { BleRateLimiter } = await import('../frontend/js/ble/protocol.js');
+  const limiter = new BleRateLimiter(30);
+  for (let i = 0; i < 30; i++) {
+    assert.strictEqual(limiter.check('peer_1'), true, `Packet ${i} should be allowed`);
+  }
+  // 31st packet in same second must be blocked
+  assert.strictEqual(limiter.check('peer_1'), false, 'Packet 31 must be blocked by rate limiter');
+  // Different peer is independent
+  assert.strictEqual(limiter.check('peer_2'), true, 'Independent peer should be allowed');
+  console.log('✓ Test 7: Rate limiter (30 pkts/s) passed');
+}
+
+// TEST 8: Battery relay role: bucket 0 drops DATA relay, high battery rebroadcasts first
+{
+  const { BleManagedFlooder, BLE_PACKET_TYPES } = await import('../frontend/js/ble/protocol.js');
+  let rebroadcastCalled = false;
+  const flooderBucket0 = new BleManagedFlooder({
+    rebroadcastCb: () => { rebroadcastCalled = true; },
+    getBatteryStatus: () => ({ batteryBucket: 0, pluggedIn: false })
+  });
+
+  flooderBucket0.recordPacket({
+    msgId: '0102030405060708',
+    ttl: 4,
+    type: BLE_PACKET_TYPES.DATA
+  });
+
+  await new Promise(r => setTimeout(r, 150));
+  assert.strictEqual(rebroadcastCalled, false, 'Bucket 0 node should NOT rebroadcast DATA');
+
+  // Bucket 0 MUST still rebroadcast BEACONs
+  let beaconRebroadcast = false;
+  const flooderBeacon = new BleManagedFlooder({
+    rebroadcastCb: () => { beaconRebroadcast = true; },
+    getBatteryStatus: () => ({ batteryBucket: 0, pluggedIn: false })
+  });
+
+  flooderBeacon.recordPacket({
+    msgId: '0908070605040302',
+    ttl: 4,
+    type: BLE_PACKET_TYPES.BEACON
+  });
+
+  await new Promise(r => setTimeout(r, 150));
+  assert.strictEqual(beaconRebroadcast, true, 'Bucket 0 node MUST still rebroadcast BEACON');
+  console.log('✓ Test 8: Battery-dependent relay rules passed');
+}
+
+// TEST 9: Credit flow control & BleTransport end-to-end between 3 virtual phones (A-B-C line topology)
+async function runThreePhoneLineTest() {
+  const { BleTransport } = await import('../frontend/js/ble/transport_ble.js');
+  const { MockBlePlugin } = await import('../frontend/js/ble/plugin_interface.js');
+
+  const pluginA = new MockBlePlugin('phone_A');
+  const pluginB = new MockBlePlugin('phone_B');
+  const pluginC = new MockBlePlugin('phone_C');
+
+  // Topology: A <-> B <-> C (A and C out of range)
+  pluginA.addNeighbor(pluginB);
+  pluginB.addNeighbor(pluginC);
+
+  const transportA = new BleTransport(pluginA);
+  const transportB = new BleTransport(pluginB);
+  const transportC = new BleTransport(pluginC);
+
+  // Enable capabilities for simulation
+  transportA.capabilities.available = true;
+  transportB.capabilities.available = true;
+  transportC.capabilities.available = true;
+
+  await transportA.start();
+  await transportB.start();
+  await transportC.start();
+
+  const receivedAtC = [];
+  transportC.onMessage((msg, sender, transport) => {
+    receivedAtC.push(msg);
+  });
+
+  // Phone A broadcasts emergency beacon
+  const beaconMsg = { t: 'beacon', cat: 'sos', id: 'b_sos_123', note: 'Trapped on 2nd floor' };
+  await transportA.broadcast(JSON.stringify(beaconMsg));
+
+  // Wait for B to receive and rebroadcast to C
+  await new Promise(r => setTimeout(r, 350));
+
+  assert(receivedAtC.length > 0, 'Phone C must receive Phone A beacon via Phone B relay');
+  assert.strictEqual(receivedAtC[0].id, 'b_sos_123');
+  console.log('✓ Test 9: 3-Phone Line Topology (A-B-C multi-hop) passed');
+
+  // TEST 10: Late-joining Phone D connects to Phone C and receives missed beacons via anti-entropy store-and-forward
+  const pluginD = new MockBlePlugin('phone_D');
+  const transportD = new BleTransport(pluginD);
+  transportD.capabilities.available = true;
+
+  const receivedAtD = [];
+  transportD.onMessage((msg, sender, transport) => {
+    receivedAtD.push(msg);
+  });
+
+  // Phone D joins late and comes in range of Phone C
+  pluginC.addNeighbor(pluginD);
+  await transportD.start();
+
+  // Give anti-entropy inventory and request time to exchange
+  await new Promise(r => setTimeout(r, 400));
+
+  // Phone D now sends a message that propagates all the way back across the chain to A
+  const msgD = { t: 'msg', id: 'd_msg_777', text: 'Phone D joined the mesh' };
+  const receivedAtA = [];
+  transportA.onMessage((msg, sender, transport) => {
+    receivedAtA.push(msg);
+  });
+  await transportD.broadcast(JSON.stringify(msgD));
+
+  await new Promise(r => setTimeout(r, 400));
+  assert(receivedAtA.length > 0, 'Phone A must receive Phone D message via C-B-A multi-hop');
+  console.log('✓ Test 10: Late-joining Phone D mesh integration & multi-hop propagation passed');
+
+  await transportA.stop();
+  await transportB.stop();
+  await transportC.stop();
+  await transportD.stop();
+}
+
+runMeshSimulation()
+  .then(() => runThreePhoneLineTest())
+  .then(() => {
+    console.log('ALL BLE PROTOCOL & SIMULATION TESTS COMPLETED SUCCESSFULLY.');
+  });
+

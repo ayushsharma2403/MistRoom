@@ -17,8 +17,9 @@ import { setupSettingsUI } from './js/settings.js';
 import {
   sendMessage, sendPublicBeacon, appendSystemMessage, closeDirectChat,
   renderPeers, renderAvailableRooms, updateBeaconBanner, renderBeaconListModal,
-  renderNeedsBoard, renderMeshTopology
+  renderNeedsBoard, renderMeshTopology, renderBleNeighbors, updateBleHeaderChip
 } from './js/ui.js';
+import { BleTransport } from './js/ble/transport_ble.js';
 import {
   startServerlessInitiator, processOfferAndCreateAnswer,
   processAnswerOnInitiator, confirmPairing, renderQrCodeTo,
@@ -809,6 +810,139 @@ document.addEventListener('DOMContentLoaded', () => {
   $('toggle-peers-btn').addEventListener('click', () => {
     const sb = $('peers-sidebar');
     sb.style.display = sb.style.display === 'flex' ? '' : 'flex';
+  });
+
+  // Initialize and register BleTransport
+  const bleTransport = new BleTransport();
+  state.bleTransport = bleTransport;
+  router.registerTransport(bleTransport);
+
+  // Setup BLE settings toggle
+  const bleToggle = $('ble-mesh-toggle');
+  const bleStatus = $('ble-mesh-status');
+  const bleNeighborCount = $('ble-neighbor-count');
+  const bleErrorBanner = $('ble-error-banner');
+  const bleErrorDesc = $('ble-error-desc');
+
+  async function updateBleUI() {
+    updateBleHeaderChip(bleTransport);
+    renderBleNeighbors(bleTransport);
+    if (bleNeighborCount) bleNeighborCount.textContent = `${bleTransport.neighbors.size}`;
+    if (bleStatus) bleStatus.textContent = bleTransport.connectedDevices.size > 0 ? `Active (${bleTransport.connectedDevices.size} connected)` : (bleToggle?.checked ? 'Scanning/Standby' : 'Inactive');
+  }
+
+  if (bleToggle) {
+    bleToggle.checked = localStorage.getItem('mistroom_ble_enabled') === 'true';
+    bleToggle.addEventListener('change', async () => {
+      const enabled = bleToggle.checked;
+      localStorage.setItem('mistroom_ble_enabled', enabled ? 'true' : 'false');
+      if (enabled) {
+        if (!bleTransport.capabilities.available) {
+          if (bleErrorBanner) {
+            bleErrorBanner.style.display = 'block';
+            if (bleErrorDesc) bleErrorDesc.textContent = 'Native BLE support unavailable in standard web browser. Please install the Android APK.';
+          }
+          appendSystemMessage('⚠️ BLE Mesh requires the MistRoom native Android app or Capacitor container.');
+          bleToggle.checked = false;
+          return;
+        }
+        const started = await bleTransport.start();
+        if (!started) {
+          if (bleErrorBanner) {
+            bleErrorBanner.style.display = 'block';
+            if (bleErrorDesc) bleErrorDesc.textContent = 'Bluetooth permissions or adapter is turned off.';
+          }
+          appendSystemMessage('❌ Failed to start BLE mesh. Please enable Bluetooth and location permissions.');
+          bleToggle.checked = false;
+        } else {
+          if (bleErrorBanner) bleErrorBanner.style.display = 'none';
+          appendSystemMessage('📶 BLE Mesh active: scanning and advertising.');
+        }
+      } else {
+        await bleTransport.stop();
+        appendSystemMessage('📶 BLE Mesh stopped.');
+      }
+      updateBleUI();
+    });
+
+    if (bleToggle.checked && bleTransport.capabilities.available) {
+      bleTransport.start().then(() => updateBleUI()).catch(() => {});
+    }
+  }
+
+  // Periodic UI update for BLE neighbors and metrics
+  setInterval(updateBleUI, 4000);
+
+  // BLE Diagnostics Modal Wiring
+  const bleDiagModal = $('ble-diag-modal');
+  const openBleDiagBtn = $('btn-open-ble-diag');
+  const closeBleDiagBtn = $('close-ble-diag-btn');
+  const bleHeaderChip = $('ble-header-chip');
+  const fixPermissionsBtn = $('btn-fix-ble-permissions');
+  const exportBleLogBtn = $('btn-export-ble-log');
+
+  function openBleDiagnostics() {
+    if (!bleDiagModal) return;
+    bleDiagModal.style.display = 'flex';
+    $('ble-metric-tx').textContent = bleTransport.metrics.packetsTx;
+    $('ble-metric-rx').textContent = bleTransport.metrics.packetsRx;
+    $('ble-metric-dropped').textContent = bleTransport.metrics.packetsDropped;
+    $('ble-metric-dup').textContent = bleTransport.metrics.packetsDup;
+    $('ble-metric-frag-tx').textContent = bleTransport.metrics.fragmentsTx;
+    $('ble-metric-frag-rx').textContent = bleTransport.metrics.fragmentsRx;
+    $('ble-metric-hops').textContent = bleTransport.avgHopCount;
+    $('ble-metric-queue').textContent = bleTransport.queue.length;
+    $('ble-metric-conn').textContent = `${bleTransport.connectedDevices.size} / 4`;
+    $('ble-metric-ratelimit').textContent = bleTransport.metrics.rateLimited;
+    $('ble-metric-sigfail').textContent = bleTransport.metrics.sigFailed;
+
+    if (!bleTransport.capabilities.available && bleErrorBanner) {
+      bleErrorBanner.style.display = 'block';
+      if (bleErrorDesc) bleErrorDesc.textContent = 'Native BLE adapter unavailable. Running in web simulation mode.';
+    }
+  }
+
+  if (openBleDiagBtn) openBleDiagBtn.addEventListener('click', openBleDiagnostics);
+  if (bleHeaderChip) bleHeaderChip.addEventListener('click', openBleDiagnostics);
+  if (closeBleDiagBtn) {
+    closeBleDiagBtn.addEventListener('click', () => {
+      if (bleDiagModal) bleDiagModal.style.display = 'none';
+    });
+  }
+
+  if (fixPermissionsBtn) {
+    fixPermissionsBtn.addEventListener('click', async () => {
+      try {
+        const ok = await bleTransport.plugin.requestPermissions();
+        if (ok) {
+          if (bleErrorBanner) bleErrorBanner.style.display = 'none';
+          appendSystemMessage('✓ BLE Permissions granted.');
+        } else {
+          alert('Bluetooth permissions or Bluetooth adapter disabled on device.');
+        }
+      } catch (e) {
+        alert('Permission request failed: ' + e.message);
+      }
+    });
+  }
+
+  if (exportBleLogBtn) {
+    exportBleLogBtn.addEventListener('click', () => {
+      const logData = bleTransport.exportDiagnosticLog();
+      const blob = new Blob([logData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mistroom_ble_diagnostics_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  // Safe-walk native alarm listener (Requirement 7)
+  window.addEventListener('mistroom:native_alarm', async ev => {
+    console.log('Native exact alarm fired for safe-walk:', ev.detail);
+    triggerSafeWalkAlert(true);
   });
 
   // Service Worker registration with update prompt

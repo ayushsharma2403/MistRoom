@@ -9,11 +9,13 @@ export const BLE_PACKET_TYPES = {
   BEACON: 0x02,
   ACK: 0x03,
   HELLO: 0x04,
-  BADGE_REQ: 0x05
+  BADGE_REQ: 0x05,
+  INV: 0x06,
+  REQ_DATA: 0x07
 };
 
 export const BLE_HEADER_SIZE = 24; // 1(ver) + 1(type) + 1(ttl) + 1(flags) + 8(msgId) + 8(srcShort) + 2(seq) + 1(fragIdx) + 1(fragCount)
-export const DEFAULT_PAYLOAD_MTU = 100;
+export const DEFAULT_PAYLOAD_MTU = 185;
 export const MAX_REASSEMBLY_MSGS = 64;
 export const REASSEMBLY_TIMEOUT_MS = 30000;
 
@@ -28,6 +30,75 @@ export function generateMsgId() {
     for (let i = 0; i < 8; i++) bytes[i] = Math.floor(Math.random() * 256);
   }
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Encode HELLO payload { peerShort, ver, batteryBucket, pluggedIn }
+ * 8 bytes peerShort (hex) + 1 byte ver + 1 byte (batteryBucket: 2 bits, pluggedIn: 1 bit)
+ */
+export function encodeHelloPayload({ peerShort = '', ver = 1, batteryBucket = 3, pluggedIn = false } = {}) {
+  const bytes = new Uint8Array(10);
+  const cleanSrc = (peerShort || '').padEnd(16, '0').slice(0, 16);
+  for (let i = 0; i < 8; i++) {
+    bytes[i] = parseInt(cleanSrc.substr(i * 2, 2), 16) || 0;
+  }
+  bytes[8] = ver & 0xFF;
+  const flags = ((batteryBucket & 0x03) << 1) | (pluggedIn ? 1 : 0);
+  bytes[9] = flags;
+  return bytes;
+}
+
+/**
+ * Decode HELLO payload into { peerShort, ver, batteryBucket, pluggedIn }
+ */
+export function decodeHelloPayload(bytes) {
+  if (!bytes || bytes.length < 10) return null;
+  let peerShort = '';
+  for (let i = 0; i < 8; i++) {
+    peerShort += bytes[i].toString(16).padStart(2, '0');
+  }
+  const ver = bytes[8];
+  const flags = bytes[9];
+  const batteryBucket = (flags >> 1) & 0x03;
+  const pluggedIn = (flags & 0x01) === 1;
+  return { peerShort, ver, batteryBucket, pluggedIn };
+}
+
+/**
+ * Per-neighbor sliding window rate limiter (max 30 packets/sec)
+ */
+export class BleRateLimiter {
+  constructor(maxPerSecond = 30) {
+    this.maxPerSecond = maxPerSecond;
+    this.deviceWindows = new Map(); // deviceId -> [timestamp, ...]
+  }
+
+  check(deviceId) {
+    const now = Date.now();
+    let timestamps = this.deviceWindows.get(deviceId);
+    if (!timestamps) {
+      timestamps = [];
+      this.deviceWindows.set(deviceId, timestamps);
+    }
+    const cutoff = now - 1000;
+    while (timestamps.length && timestamps[0] < cutoff) {
+      timestamps.shift();
+    }
+    if (timestamps.length >= this.maxPerSecond) {
+      return false; // Rate exceeded
+    }
+    timestamps.push(now);
+    return true;
+  }
+
+  cleanup() {
+    const cutoff = Date.now() - 5000;
+    for (const [id, list] of this.deviceWindows.entries()) {
+      if (!list.length || list[list.length - 1] < cutoff) {
+        this.deviceWindows.delete(id);
+      }
+    }
+  }
 }
 
 /**
@@ -197,11 +268,12 @@ export class BleReassembler {
  * Managed Flooding Engine with Seen Cache and Gossip Suppression
  */
 export class BleManagedFlooder {
-  constructor({ maxSeen = 2000, seenTtlMs = 600000, rebroadcastCb } = {}) {
+  constructor({ maxSeen = 2000, seenTtlMs = 600000, rebroadcastCb, getBatteryStatus } = {}) {
     this.seenCache = new Map(); // msgId -> { count, timestamp }
     this.maxSeen = maxSeen;
     this.seenTtlMs = seenTtlMs;
     this.rebroadcastCb = rebroadcastCb;
+    this.getBatteryStatus = getBatteryStatus || (() => ({ batteryBucket: 3, pluggedIn: false }));
     this.pendingJitterTimers = new Map(); // msgId -> timerId
   }
 
@@ -217,7 +289,7 @@ export class BleManagedFlooder {
 
   recordPacket(decodedPacket) {
     const now = Date.now();
-    const { msgId, ttl } = decodedPacket;
+    const { msgId, ttl, type } = decodedPacket;
     let entry = this.seenCache.get(msgId);
 
     if (entry) {
@@ -239,7 +311,21 @@ export class BleManagedFlooder {
 
     // Schedule rebroadcast if TTL > 1
     if (ttl > 1 && this.rebroadcastCb) {
-      const jitterMs = Math.floor(Math.random() * 100) + 20; // 20 - 120 ms
+      const { batteryBucket, pluggedIn } = this.getBatteryStatus();
+      
+      // Nodes with bucket 0 do not relay DATA (only send own messages & beacons)
+      if (batteryBucket === 0 && type === BLE_PACKET_TYPES.DATA) {
+        return true;
+      }
+
+      // Shorter jitter for bucket 3 or plugged in to rebroadcast first
+      let jitterMs;
+      if (pluggedIn || batteryBucket === 3) {
+        jitterMs = Math.floor(Math.random() * 40) + 10; // 10 - 50 ms
+      } else {
+        jitterMs = Math.floor(Math.random() * 80) + 60; // 60 - 140 ms
+      }
+
       const timer = setTimeout(() => {
         this.pendingJitterTimers.delete(msgId);
         const decremented = { ...decodedPacket, ttl: ttl - 1 };
