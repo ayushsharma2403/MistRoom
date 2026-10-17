@@ -4,27 +4,31 @@
 import { state, $ } from './js/state.js';
 import { deriveEncryptionKey, getOrCreateIdentity } from './js/crypto.js';
 import { initIndexedDB, flushOfflineOutbox } from './js/outbox.js';
-import {
-  sendMessage, appendSystemMessage, closeDirectChat,
-  renderPeers, renderAvailableRooms
-} from './js/ui.js';
+import { initTriageRules } from './js/triage.js';
+import { connectWebSocket } from './js/ws.js';
 import { sendEncryptedFile } from './js/files.js';
 import {
   startCall, acceptIncomingCall, declineIncomingCall,
   endCall, toggleMic
 } from './js/calls.js';
 import { setupSettingsUI } from './js/settings.js';
-import { connectWebSocket } from './js/ws.js';
+import {
+  sendMessage, sendPublicBeacon, appendSystemMessage, closeDirectChat,
+  renderPeers, renderAvailableRooms, updateBeaconBanner, renderBeaconListModal,
+  renderNeedsBoard, renderMeshTopology
+} from './js/ui.js';
 
 export function switchRoom(newRoom) {
   if (!newRoom) return;
-  state.currentRoom = newRoom.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'global';
-  $('active-room-badge').textContent = `#${state.currentRoom}`;
+  const targetRoom = newRoom.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'global';
+  if (targetRoom === state.currentRoom) return;
 
-  appendSystemMessage(`Switched to room: #${state.currentRoom}`);
+  // Clear active direct chat on room switch
+  closeDirectChat();
 
+  // Send switch_room frame to server; UI updates (badge, peers, key re-derivation) occur on 'history' event
   if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-    state.ws.send(JSON.stringify({ t: 'switch_room', room: state.currentRoom }));
+    state.ws.send(JSON.stringify({ t: 'switch_room', room: targetRoom }));
   }
 }
 
@@ -74,6 +78,7 @@ async function handleJoin() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initIndexedDB();
+  initTriageRules();
 
   window.addEventListener('online', () => {
     appendSystemMessage('🌐 Network reconnected. Flushing offline outbox...');
@@ -186,47 +191,170 @@ document.addEventListener('DOMContentLoaded', () => {
     input.value = '';
   });
 
+  async function promptBeaconConsentIfNeeded() {
+    if (state.beaconConsent) return state.beaconConsent;
+    return new Promise(resolve => {
+      const modal = $('beacon-consent-modal');
+      const publicBtn = $('beacon-consent-public-btn');
+      const roomBtn = $('beacon-consent-room-btn');
+      if (!modal || !publicBtn || !roomBtn) {
+        return resolve('room_only');
+      }
+
+      modal.style.display = 'flex';
+
+      const handleChoice = choice => {
+        modal.style.display = 'none';
+        state.beaconConsent = choice;
+        localStorage.setItem('mistroom_beacon_consent', choice);
+        publicBtn.removeEventListener('click', onPublic);
+        roomBtn.removeEventListener('click', onRoom);
+        resolve(choice);
+      };
+
+      const onPublic = () => handleChoice('public');
+      const onRoom = () => handleChoice('room_only');
+
+      publicBtn.addEventListener('click', onPublic);
+      roomBtn.addEventListener('click', onRoom);
+    });
+  }
+
   const womenSafetyBtn = $('women-safety-btn');
   if (womenSafetyBtn) {
-    womenSafetyBtn.addEventListener('click', () => {
+    womenSafetyBtn.addEventListener('click', async () => {
       const input = $('message-input');
       const customNote = input.value.trim();
       input.value = '';
 
+      const consent = await promptBeaconConsentIfNeeded();
+
+      let coords = null;
       if (navigator.geolocation) {
-        appendSystemMessage('🛡️ Women Safety Alert: Acquiring live coordinates...');
-        navigator.geolocation.getCurrentPosition(
-          pos => {
-            const coords = `📍 [Location: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}]`;
-            const alertText = `EMERGENCY WOMEN SAFETY DISTRESS: I feel unsafe / need assistance! ${coords} ${customNote ? '(' + customNote + ')' : ''}`;
-            sendMessage(alertText, true);
-          },
-          () => {
-            sendMessage(`EMERGENCY WOMEN SAFETY DISTRESS: I feel unsafe / need immediate assistance! ${customNote ? '(' + customNote + ')' : ''}`, true);
-          },
-          { timeout: 6000, enableHighAccuracy: true }
-        );
-      } else {
-        sendMessage(`EMERGENCY WOMEN SAFETY DISTRESS: I feel unsafe / need immediate assistance! ${customNote ? '(' + customNote + ')' : ''}`, true);
+        appendSystemMessage('🛡️ Women Safety Alert: Acquiring live coordinates (max 3s)...');
+        try {
+          coords = await new Promise(resolve => {
+            let timedOut = false;
+            const timer = setTimeout(() => {
+              timedOut = true;
+              appendSystemMessage('⚠️ GPS fix timed out after 3 seconds. Sending alert without coordinates.');
+              resolve(null);
+            }, 3000);
+
+            navigator.geolocation.getCurrentPosition(
+              pos => {
+                if (!timedOut) {
+                  clearTimeout(timer);
+                  resolve({
+                    lat: pos.coords.latitude,
+                    lon: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy
+                  });
+                }
+              },
+              err => {
+                if (!timedOut) {
+                  clearTimeout(timer);
+                  appendSystemMessage(`⚠️ GPS error: ${err.message}. Sending without coordinates.`);
+                  resolve(null);
+                }
+              },
+              { timeout: 3000, enableHighAccuracy: true }
+            );
+          });
+        } catch (e) {
+          coords = null;
+        }
+      }
+
+      const locSuffix = coords
+        ? `📍 [Location: ${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)} ±${Math.round(coords.accuracy)}m]`
+        : '📍 [Location: Unavailable]';
+      const alertText = `EMERGENCY WOMEN SAFETY DISTRESS: I feel unsafe / need assistance! ${locSuffix} ${customNote ? '(' + customNote + ')' : ''}`;
+
+      // Send room message with explicit category 'women_safety'
+      await sendMessage(alertText, 'women_safety');
+
+      // If user consented to public beacon, send beacon event
+      if (consent === 'public') {
+        const shortNote = `Women Safety: ${customNote || 'Distress alert'}`;
+        await sendPublicBeacon('women_safety', 3, shortNote, coords);
       }
     });
   }
 
-  $('sos-btn').addEventListener('click', () => {
+  $('sos-btn').addEventListener('click', async () => {
     const input = $('message-input');
     const text = input.value.trim();
-    sendMessage('SOS! I need immediate help. ' + text, true);
     input.value = '';
+
+    const consent = await promptBeaconConsentIfNeeded();
+    const alertText = `SOS! I need immediate help. ${text}`;
+
+    // Send room message with explicit category 'sos'
+    await sendMessage(alertText, 'sos');
+
+    // If user consented to public beacon, send beacon event
+    if (consent === 'public') {
+      const shortNote = `SOS Emergency: ${text || 'Need help immediately'}`;
+      await sendPublicBeacon('sos', 3, shortNote, null);
+    }
   });
+
+  // Beacon Banner & Modal clicks
+  const beaconBanner = $('beacon-banner');
+  if (beaconBanner) {
+    beaconBanner.addEventListener('click', () => {
+      renderBeaconListModal();
+      const modal = $('beacon-list-modal');
+      if (modal) modal.style.display = 'flex';
+    });
+  }
+
+  const closeBeaconListBtn = $('close-beacon-list-btn');
+  if (closeBeaconListBtn) {
+    closeBeaconListBtn.addEventListener('click', () => {
+      const modal = $('beacon-list-modal');
+      if (modal) modal.style.display = 'none';
+    });
+  }
+
+  // Sidebar Tab Switching (Peers / Needs / Mesh)
+  const tabBtnPeers = $('tab-btn-peers');
+  const tabBtnNeeds = $('tab-btn-needs');
+  const tabBtnMesh = $('tab-btn-mesh');
+  const panelPeers = $('tab-panel-peers');
+  const panelNeeds = $('tab-panel-needs');
+  const panelMesh = $('tab-panel-mesh');
+
+  function selectTab(activeTab) {
+    if (tabBtnPeers) tabBtnPeers.classList.toggle('active', activeTab === 'peers');
+    if (tabBtnNeeds) tabBtnNeeds.classList.toggle('active', activeTab === 'needs');
+    if (tabBtnMesh) tabBtnMesh.classList.toggle('active', activeTab === 'mesh');
+
+    if (panelPeers) panelPeers.style.display = activeTab === 'peers' ? 'block' : 'none';
+    if (panelNeeds) {
+      panelNeeds.style.display = activeTab === 'needs' ? 'block' : 'none';
+      if (activeTab === 'needs') renderNeedsBoard();
+    }
+    if (panelMesh) {
+      panelMesh.style.display = activeTab === 'mesh' ? 'block' : 'none';
+      if (activeTab === 'mesh') renderMeshTopology();
+    }
+  }
+
+  if (tabBtnPeers) tabBtnPeers.addEventListener('click', () => selectTab('peers'));
+  if (tabBtnNeeds) tabBtnNeeds.addEventListener('click', () => selectTab('needs'));
+  if (tabBtnMesh) tabBtnMesh.addEventListener('click', () => selectTab('mesh'));
 
   $('gps-btn').addEventListener('click', () => {
     if (!navigator.geolocation) {
       return appendSystemMessage('Geolocation is not supported by your device.');
     }
-    appendSystemMessage('📡 Querying GPS coordinates...');
+    appendSystemMessage('📡 Querying GPS coordinates (max 3s)...');
     navigator.geolocation.getCurrentPosition(
       pos => {
-        const coords = `📍 [Location: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}] `;
+        const coords = `📍 [Location: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)} ±${Math.round(pos.coords.accuracy)}m] `;
         const input = $('message-input');
         input.value = coords + input.value;
         input.focus();
@@ -234,7 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
       err => {
         appendSystemMessage(`⚠️ Geolocation error: ${err.message}`);
       },
-      { timeout: 8000, enableHighAccuracy: true }
+      { timeout: 3000, enableHighAccuracy: true }
     );
   });
 

@@ -9,20 +9,25 @@ import { appendMessageToUI, appendSystemMessage } from './ui.js';
 export const CHUNK_SIZE = 16384;
 
 export function dispatchFilePacket(packet) {
-  let count = 0;
+  let sentViaP2P = false;
   if (packet.target_peer) {
     const peer = state.meshPeers.get(packet.target_peer);
     if (peer && peer.dc && peer.dc.readyState === 'open') {
       try {
         peer.dc.send(JSON.stringify(packet));
-        count = 1;
+        sentViaP2P = true;
       } catch (e) {}
     }
   } else {
-    count = broadcastOverP2P(packet);
+    // If we have open P2P peers, send only via P2P
+    const count = broadcastOverP2P(packet);
+    if (count > 0) {
+      sentViaP2P = true;
+    }
   }
 
-  if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+  // Single path transmission: if sent over open DataChannel, do NOT send over WS relay
+  if (!sentViaP2P && state.ws && state.ws.readyState === WebSocket.OPEN) {
     state.ws.send(JSON.stringify({ t: 'p2p_file', target: packet.target_peer, data: packet }));
   }
 }
@@ -161,6 +166,11 @@ export async function sendEncryptedFile(file) {
 
 export async function handleIncomingFilePacket(packet) {
   if (packet.t === 'file_meta') {
+    if (!packet.fileId || state.activeIncomingFiles.has(packet.fileId)) {
+      // Ignore duplicate meta packet for the same fileId
+      return;
+    }
+
     // Decrypt metadata from v2 envelope
     let meta = null;
     if (packet.meta_env) {

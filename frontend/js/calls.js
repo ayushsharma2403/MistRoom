@@ -80,6 +80,18 @@ export async function startCall(peer) {
 }
 
 export async function handleIncomingCallInvite(senderPeerId, senderName, data) {
+  // If callee is already in a call, auto-decline (busy)
+  if (state.activeCallPeerConnection) {
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({
+        t: 'call_decline',
+        target: senderPeerId,
+        reason: 'busy'
+      }));
+    }
+    return;
+  }
+
   state.pendingIncomingCall = {
     peer_id: senderPeerId,
     name: senderName,
@@ -135,6 +147,17 @@ export async function acceptIncomingCall() {
   };
 
   await state.activeCallPeerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+  // Flush buffered ICE candidates that arrived before peer connection existed
+  if (state.pendingCallIceCandidates && state.pendingCallIceCandidates.length > 0) {
+    for (const cand of state.pendingCallIceCandidates) {
+      try {
+        await state.activeCallPeerConnection.addIceCandidate(new RTCIceCandidate(cand));
+      } catch (e) {}
+    }
+    state.pendingCallIceCandidates = [];
+  }
+
   const answer = await state.activeCallPeerConnection.createAnswer();
   await state.activeCallPeerConnection.setLocalDescription(answer);
 

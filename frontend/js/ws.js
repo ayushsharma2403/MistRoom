@@ -2,10 +2,10 @@
  * WebSocket signaling and real-time mesh hub client.
  */
 import { state, $ } from './state.js';
-import { decryptMessage } from './crypto.js';
 import {
   appendMessageToUI, updateMessageStatus, updateSOSBanner,
-  renderPeers, renderAvailableRooms
+  renderPeers, renderAvailableRooms, updateBeaconBanner,
+  renderBeaconListModal, renderNeedsBoard, renderMeshTopology
 } from './ui.js';
 import { handleIncomingFilePacket } from './files.js';
 import { sendDeliveryAck, initWebRTCPeer } from './mesh.js';
@@ -13,10 +13,9 @@ import {
   handleIncomingCallInvite, activeCallPeerConnection,
   startCallTimer, endCall
 } from './calls.js';
-
 import {
   decryptEnvelope, verifyMessageSignature, signChallengeNonce,
-  bytesToBase64
+  bytesToBase64, deriveEncryptionKey
 } from './crypto.js';
 
 export function connectWebSocket(onSwitchRoom) {
@@ -63,9 +62,40 @@ export function connectWebSocket(onSwitchRoom) {
     }
 
     if (data.t === 'history') {
-      state.messagesHistory.length = 0;
-      $('messages-list').textContent = '';
-      for (const m of data.history) {
+      const incomingRoom = data.room || state.currentRoom;
+      const isRoomSwitch = incomingRoom !== state.currentRoom;
+
+      if (isRoomSwitch) {
+        state.currentRoom = incomingRoom;
+        $('active-room-badge').textContent = '#' + state.currentRoom;
+
+        // Re-derive room key with new room salt
+        if (state.currentPasskey) {
+          state.cryptoKey = await deriveEncryptionKey(state.currentPasskey, state.currentRoom);
+        }
+
+        // Close and rebuild WebRTC peers for the new room
+        for (const [, peer] of state.meshPeers) {
+          try {
+            if (peer.dc) peer.dc.close();
+            if (peer.pc) peer.pc.close();
+          } catch (e) {}
+        }
+        state.meshPeers.clear();
+      }
+
+      // Merge history by ID instead of wiping outbox / local system bubbles
+      // Keep existing local notes, unsent/queued bubbles, or existing processed bubbles
+      const existingIds = new Set(state.messagesHistory.map(m => m.id));
+      const incomingHistory = data.history || [];
+
+      for (const m of incomingHistory) {
+        if (!m || !m.id) continue;
+        if (existingIds.has(m.id)) {
+          // Already have it in state
+          continue;
+        }
+
         let isVerified = false;
         if (m.sig && m.pk && m.envelope) {
           isVerified = verifyMessageSignature(m.envelope, m.sig, m.pk, m.room, m.id, m.ts);
@@ -84,8 +114,26 @@ export function connectWebSocket(onSwitchRoom) {
         state.messagesHistory.push(m);
         appendMessageToUI(m, false);
       }
+
+      // Sort chronological
+      state.messagesHistory.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
       $('messages-list').scrollTop = $('messages-list').scrollHeight;
       updateSOSBanner();
+    }
+
+    if (data.t === 'beacon') {
+      if (!data.id || state.activeBeacons.has(data.id)) return;
+      state.activeBeacons.set(data.id, data);
+      updateBeaconBanner();
+      renderBeaconListModal();
+    }
+
+    if (data.t === 'need_resolved') {
+      if (data.id) {
+        state.openNeeds.delete(data.id);
+        renderNeedsBoard();
+      }
     }
 
     if (data.t === 'msg') {
@@ -117,7 +165,6 @@ export function connectWebSocket(onSwitchRoom) {
           data.unreadable = true;
         }
       } else if (data.msg.ciphertext && data.msg.iv) {
-        // Fallback for mock/legacy
         data.msg.text = null;
         data.unreadable = true;
       }
@@ -133,7 +180,7 @@ export function connectWebSocket(onSwitchRoom) {
     }
 
     if (data.t === 'msg_ack') {
-      updateMessageStatus(data.id, data.status || 'delivered');
+      updateMessageStatus(data.id, data.status || 'delivered', data.from_peer);
     }
 
     if (data.t === 'p2p_file' && data.data) {
@@ -153,6 +200,7 @@ export function connectWebSocket(onSwitchRoom) {
           initWebRTCPeer(p.peer_id, isInitiator);
         }
       });
+      renderMeshTopology();
     }
 
     if (data.t === 'webrtc_offer') {
@@ -191,6 +239,15 @@ export function connectWebSocket(onSwitchRoom) {
     if (data.t === 'call_accept' && data.data) {
       if (state.activeCallPeerConnection) {
         await state.activeCallPeerConnection.setRemoteDescription(new RTCSessionDescription(data.data));
+        // Flush any buffered ICE candidates for caller
+        if (state.pendingCallIceCandidates && state.pendingCallIceCandidates.length > 0) {
+          for (const cand of state.pendingCallIceCandidates) {
+            try {
+              await state.activeCallPeerConnection.addIceCandidate(new RTCIceCandidate(cand));
+            } catch (e) {}
+          }
+          state.pendingCallIceCandidates = [];
+        }
         $('call-status-label').textContent = 'Connected';
         startCallTimer();
       }
@@ -205,10 +262,14 @@ export function connectWebSocket(onSwitchRoom) {
     }
 
     if (data.t === 'call_ice' && data.data) {
-      if (state.activeCallPeerConnection) {
+      if (state.activeCallPeerConnection && state.activeCallPeerConnection.remoteDescription) {
         try {
           await state.activeCallPeerConnection.addIceCandidate(new RTCIceCandidate(data.data));
         } catch (e) {}
+      } else {
+        // Buffer ICE candidates that arrive before peer connection or remote description exists
+        if (!state.pendingCallIceCandidates) state.pendingCallIceCandidates = [];
+        state.pendingCallIceCandidates.push(data.data);
       }
     }
   };

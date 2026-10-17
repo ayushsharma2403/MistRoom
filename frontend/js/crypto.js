@@ -131,7 +131,32 @@ export function verifyMessageEnvelope(room, id, ts, n, c, sigB64, pkB64, expecte
   }
 }
 
-export function encryptEnvelope(plaintext, keyBytes) {
+export function signAck(id, status) {
+  if (!state.identity || !state.identity.privKey) return '';
+  const data = new TextEncoder().encode(`ack|${id}|${status}`);
+  const sigBytes = ed25519.sign(data, state.identity.privKey);
+  return bytesToBase64(sigBytes);
+}
+
+export function signResolveNeed(id) {
+  if (!state.identity || !state.identity.privKey) return '';
+  const data = new TextEncoder().encode(`resolve|${id}`);
+  const sigBytes = ed25519.sign(data, state.identity.privKey);
+  return bytesToBase64(sigBytes);
+}
+
+export function verifyGenericSig(dataStr, sigB64, pkB64) {
+  try {
+    const pkBytes = base64ToBytes(pkB64);
+    const sigBytes = base64ToBytes(sigB64);
+    const data = new TextEncoder().encode(dataStr);
+    return ed25519.verify(sigBytes, data, pkBytes);
+  } catch (e) {
+    return false;
+  }
+}
+
+export function encryptEnvelope(plaintext, keyBytes = state.cryptoKey) {
   const enc = new TextEncoder();
   const rawBytes = enc.encode(plaintext);
   const nonce = new Uint8Array(24);
@@ -147,9 +172,13 @@ export function encryptEnvelope(plaintext, keyBytes) {
   };
 }
 
-export function decryptEnvelope(envelope, keyBytes) {
+export function decryptEnvelope(envelope, keyBytes = state.cryptoKey) {
   if (!envelope || envelope.v !== 2 || !envelope.n || !envelope.c) {
     console.debug('Rejected non-v2 envelope:', envelope);
+    return null;
+  }
+  if (!keyBytes) {
+    console.debug('No crypto key available to decrypt envelope');
     return null;
   }
   try {

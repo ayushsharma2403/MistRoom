@@ -80,13 +80,26 @@ export function setupSettingsUI() {
   const stealthToggle = $('stealth-mode-toggle');
   const panicWipeBtn = $('panic-wipe-btn');
 
+  const beaconToggle = $('beacon-mode-toggle');
+
   if (settingsBtn && settingsModal) {
     settingsBtn.addEventListener('click', () => {
       settingsModal.style.display = 'flex';
       const phrase = generateRecoveryPhrase(state.currentPasskey, state.myPeerId);
       if (recoveryDisplay) recoveryDisplay.textContent = phrase;
       if (stealthToggle) stealthToggle.checked = state.isStealthMode;
+      if (beaconToggle) beaconToggle.checked = state.beaconConsent === 'public';
       renderBlockedList();
+    });
+  }
+
+  if (beaconToggle) {
+    beaconToggle.addEventListener('change', () => {
+      state.beaconConsent = beaconToggle.checked ? 'public' : 'room_only';
+      localStorage.setItem('mistroom_beacon_consent', state.beaconConsent);
+      appendSystemMessage(beaconToggle.checked
+        ? '📢 Public emergency beacon broadcast enabled.'
+        : '🔒 Emergency alerts restricted to current room only.');
     });
   }
 

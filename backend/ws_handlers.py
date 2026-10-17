@@ -8,7 +8,7 @@ from fastapi import WebSocket
 from pydantic import BaseModel, Field, ValidationError
 
 from backend.state import (
-    clients, seen_ids, history, send_json, broadcast_peers,
+    clients, seen_ids, get_room_history, active_beacons, send_json, broadcast_peers,
     RESERVED_HANDLES, format_displayed_handle
 )
 
@@ -93,6 +93,28 @@ class MsgAckModel(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     target_peer: str = Field(min_length=1, max_length=64)
     status: Optional[str] = Field(default="delivered", max_length=20)
+    sig: Optional[str] = None
+    pk: Optional[str] = None
+
+
+class BeaconModel(BaseModel):
+    t: Literal["beacon"]
+    id: str = Field(min_length=1, max_length=64)
+    cat: str = Field(min_length=1, max_length=32)
+    prio: int = Field(default=3, ge=0, le=3)
+    short_text: str = Field(min_length=1, max_length=140)
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    accuracy: Optional[float] = None
+    handle: Optional[str] = Field(default=None, max_length=30)
+    ts: Optional[int] = None
+
+
+class NeedResolvedModel(BaseModel):
+    t: Literal["need_resolved"]
+    id: str = Field(min_length=1, max_length=64)
+    sig: str = Field(min_length=1)
+    pk: str = Field(min_length=1)
 
 
 class SignalingModel(BaseModel):
@@ -149,17 +171,16 @@ async def handle_join_v2(ws: WebSocket, msg_data: dict, challenge_nonce: str):
     clients[ws]["room"] = room
     clients[ws]["pk"] = parsed.pk
 
-    # Filter room history (never include DMs)
-    room_history = [
-        m for m in history
-        if m.get("room", "global") == room and not m.get("target_peer")
-    ]
+    # Per-room history (never include DMs)
+    room_hist = get_room_history(room)
+    room_history = list(room_hist)
 
     await send_json(ws, {
         "t": "history",
         "history": room_history,
         "peer_id": peer_id,
-        "room": room
+        "room": room,
+        "active_beacons": list(active_beacons.values())
     })
     await broadcast_peers()
 
@@ -177,15 +198,15 @@ async def handle_switch_room_v2(ws: WebSocket, msg_data: dict):
         return
 
     clients[ws]["room"] = new_room
-    room_history = [
-        m for m in history
-        if m.get("room", "global") == new_room and not m.get("target_peer")
-    ]
+    room_hist = get_room_history(new_room)
+    room_history = list(room_hist)
+
     await send_json(ws, {
         "t": "history",
         "history": room_history,
         "peer_id": clients[ws]["peer_id"],
-        "room": new_room
+        "room": new_room,
+        "active_beacons": list(active_beacons.values())
     })
     await broadcast_peers()
 
@@ -227,6 +248,12 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
     current_room = clients[ws]["room"]
     display_name = format_displayed_handle(clients[ws]["name"], sender_peer_id, current_room)
 
+    # Calculate count of other peers in the room at send time for delivery ticks
+    room_peer_count = sum(
+        1 for cl in clients.values()
+        if cl.get("room") == current_room and cl.get("peer_id") != sender_peer_id
+    )
+
     record = {
         "id": mid,
         "from": display_name,
@@ -237,7 +264,8 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
         "pk": parsed.pk,
         "ts": msg_data.get("ts", ts),
         "cat": parsed.cat or "general",
-        "prio": parsed.prio if parsed.prio is not None else 0
+        "prio": parsed.prio if parsed.prio is not None else 0,
+        "expected_peers": room_peer_count
     }
 
     if parsed.target_peer:
@@ -248,11 +276,72 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
             if client_info.get("peer_id") in (parsed.target_peer, sender_peer_id):
                 await send_json(client_ws, {"t": "msg", "msg": record})
     else:
-        # Normal room message: append to history and broadcast to current room peers only
-        history.append(record)
+        # Normal room message: append to room history and broadcast to current room peers only
+        room_hist = get_room_history(current_room)
+        room_hist.append(record)
         for client_ws, client_info in list(clients.items()):
             if client_info.get("room") == current_room:
                 await send_json(client_ws, {"t": "msg", "msg": record})
+
+
+async def handle_beacon_v2(ws: WebSocket, msg_data: dict):
+    """Handle public beacon: unencrypted, broadcast to ALL connected clients in EVERY room."""
+    try:
+        parsed = BeaconModel(**msg_data)
+    except ValidationError:
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+
+    bid = parsed.id
+    if bid in seen_ids:
+        return
+    seen_ids.append(bid)
+
+    sender_pid = clients[ws].get("peer_id") or "unknown"
+    handle = parsed.handle or clients[ws].get("name") or "Citizen"
+    ts = parsed.ts or int(time.time() * 1000)
+
+    beacon_record = {
+        "t": "beacon",
+        "id": bid,
+        "cat": parsed.cat,
+        "prio": parsed.prio,
+        "short_text": parsed.short_text,
+        "lat": parsed.lat,
+        "lon": parsed.lon,
+        "accuracy": parsed.accuracy,
+        "handle": handle,
+        "peer_id": sender_pid,
+        "ts": ts
+    }
+
+    active_beacons[bid] = beacon_record
+
+    # Broadcast to ALL connected clients in every room
+    for client_ws in list(clients.keys()):
+        await send_json(client_ws, beacon_record)
+
+
+async def handle_need_resolved_v2(ws: WebSocket, msg_data: dict):
+    """Handle resolved need event signed by requester."""
+    try:
+        parsed = NeedResolvedModel(**msg_data)
+    except ValidationError:
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+
+    sig_payload = f"resolve|{parsed.id}".encode()
+    if not verify_ed25519_sig(parsed.pk, parsed.sig, sig_payload):
+        await send_json(ws, {"t": "error", "code": "bad_signature"})
+        return
+
+    # Broadcast to all clients
+    for client_ws in list(clients.keys()):
+        await send_json(client_ws, {
+            "t": "need_resolved",
+            "id": parsed.id,
+            "pk": parsed.pk
+        })
 
 
 async def handle_msg_ack_v2(ws: WebSocket, msg_data: dict):
@@ -264,13 +353,22 @@ async def handle_msg_ack_v2(ws: WebSocket, msg_data: dict):
 
     target = parsed.target_peer
     sender_pid = clients[ws]["peer_id"]
+
+    # Verify signature if provided for authenticated delivery
+    if parsed.sig and parsed.pk:
+        sig_payload = f"ack|{parsed.id}|{parsed.status}".encode()
+        if not verify_ed25519_sig(parsed.pk, parsed.sig, sig_payload):
+            await send_json(ws, {"t": "error", "code": "bad_signature"})
+            return
+
     for client_ws, client_info in list(clients.items()):
         if client_info.get("peer_id") == target:
             await send_json(client_ws, {
                 "t": "msg_ack",
                 "id": parsed.id,
                 "from_peer": sender_pid,
-                "status": parsed.status or "delivered"
+                "status": parsed.status or "delivered",
+                "sig": parsed.sig
             })
 
 

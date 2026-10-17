@@ -252,3 +252,87 @@ def test_invalid_prio_keeps_connection_alive(ws_server):
 
     asyncio.run(_run())
 
+
+def test_beacon_crosses_rooms_to_all_clients(ws_server):
+    """Verify beacon event is sent to all connected clients across different rooms."""
+    async def _run():
+        uri = ws_server
+        async with websockets.connect(uri) as ws_a, websockets.connect(uri) as ws_b:
+            await join_ws(ws_a, "user_roomA", "roomA")
+            await join_ws(ws_b, "user_roomB", "roomB")
+            await asyncio.sleep(0.05)
+
+            # Drain welcome messages
+            for ws in (ws_a, ws_b):
+                while True:
+                    try:
+                        await asyncio.wait_for(ws.recv(), timeout=0.05)
+                    except asyncio.TimeoutError:
+                        break
+
+            # User in roomA sends beacon
+            beacon_payload = {
+                "t": "beacon",
+                "id": "b_test_123",
+                "cat": "sos",
+                "prio": 3,
+                "short_text": "SOS emergency test",
+                "handle": "user_roomA",
+                "ts": int(time.time() * 1000)
+            }
+            await ws_a.send(json.dumps(beacon_payload))
+
+            # Both roomA and roomB must receive it
+            rec_a = await asyncio.wait_for(ws_a.recv(), timeout=1.0)
+            data_a = json.loads(rec_a)
+            assert data_a["t"] == "beacon"
+            assert data_a["id"] == "b_test_123"
+
+            rec_b = await asyncio.wait_for(ws_b.recv(), timeout=1.0)
+            data_b = json.loads(rec_b)
+            assert data_b["t"] == "beacon"
+            assert data_b["id"] == "b_test_123"
+
+    asyncio.run(_run())
+
+
+def test_room_switch_both_ways(ws_server):
+    """Verify room switching sends switch_room and returns target room history."""
+    async def _run():
+        uri = ws_server
+        async with websockets.connect(uri) as ws:
+            await join_ws(ws, "alice", "room1")
+            await asyncio.sleep(0.05)
+
+            # Drain
+            while True:
+                try:
+                    await asyncio.wait_for(ws.recv(), timeout=0.05)
+                except asyncio.TimeoutError:
+                    break
+
+            # Switch to room2
+            await ws.send(json.dumps({"t": "switch_room", "room": "room2"}))
+            # First reply is history
+            rec1 = await asyncio.wait_for(ws.recv(), timeout=1.0)
+            data1 = json.loads(rec1)
+            assert data1["t"] == "history"
+            assert data1["room"] == "room2"
+
+            # Drain any subsequent broadcast (e.g. people)
+            while True:
+                try:
+                    await asyncio.wait_for(ws.recv(), timeout=0.05)
+                except asyncio.TimeoutError:
+                    break
+
+            # Switch back to room1
+            await ws.send(json.dumps({"t": "switch_room", "room": "room1"}))
+            rec2 = await asyncio.wait_for(ws.recv(), timeout=1.0)
+            data2 = json.loads(rec2)
+            assert data2["t"] == "history"
+            assert data2["room"] == "room1"
+
+    asyncio.run(_run())
+
+

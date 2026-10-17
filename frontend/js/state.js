@@ -24,7 +24,12 @@ export const state = {
   callTimerInterval: null,
   callSeconds: 0,
   pendingIncomingCall: null,
-  dbInstance: null
+  pendingCallIceCandidates: [], // Buffer for ICE candidates arriving before PC ready
+  dbInstance: null,
+  activeBeacons: new Map(), // beaconId -> beaconRecord
+  beaconConsent: localStorage.getItem('mistroom_beacon_consent'), // 'beacon' | 'room_only' | null
+  messageAcks: new Map(), // msgId -> Set of peerIds who acked
+  openNeeds: new Map() // msgId -> needRecord
 };
 
 export const $ = id => document.getElementById(id);

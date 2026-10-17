@@ -2,7 +2,7 @@
  * WebRTC P2P DataChannel Mesh Networking.
  */
 import { state, $ } from './state.js';
-import { decryptMessage } from './crypto.js';
+import { decryptMessage, signAck, bytesToBase64 } from './crypto.js';
 import { flushOfflineOutbox } from './outbox.js';
 import {
   updateMessageStatus, appendMessageToUI, updateSOSBanner
@@ -46,12 +46,16 @@ export function relayMultiHop(packet, incomingPeerId) {
 
 export function sendDeliveryAck(msgId, senderPeerId) {
   if (!msgId || !senderPeerId || senderPeerId === state.myPeerId) return;
+  const sigB64 = signAck(msgId, 'delivered');
+  const pkB64 = state.identity ? bytesToBase64(state.identity.pubKey) : '';
   const ack = {
     t: 'msg_ack',
     id: msgId,
     target_peer: senderPeerId,
     from_peer: state.myPeerId,
-    status: 'delivered'
+    status: 'delivered',
+    pk: pkB64,
+    sig: sigB64
   };
 
   const peer = state.meshPeers.get(senderPeerId);
@@ -81,7 +85,24 @@ export function attachDataChannelEvents(dc, targetPeerId) {
       const msg = JSON.parse(event.data);
 
       if (msg.t === 'msg_ack') {
-        updateMessageStatus(msg.id, msg.status || 'delivered');
+        updateMessageStatus(msg.id, msg.status || 'delivered', msg.from_peer);
+        return;
+      }
+
+      if (msg.t === 'beacon' && msg.id) {
+        if (!state.activeBeacons.has(msg.id)) {
+          state.activeBeacons.set(msg.id, msg);
+          import('./ui.js').then(u => {
+            u.updateBeaconBanner();
+            u.renderBeaconListModal();
+          });
+        }
+        return;
+      }
+
+      if (msg.t === 'need_resolved' && msg.id) {
+        state.openNeeds.delete(msg.id);
+        import('./ui.js').then(u => u.renderNeedsBoard());
         return;
       }
 
