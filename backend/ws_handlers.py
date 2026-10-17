@@ -1,12 +1,8 @@
 """WebSocket event handlers for MistRoom."""
-import asyncio
 import time
 from fastapi import WebSocket
 from backend.ai import triage as triage_message
-from backend.state import (
-    clients, seen_ids, history, send_json, broadcast_peers,
-    db_save_peer, db_save_message
-)
+from backend.state import clients, seen_ids, history, send_json, broadcast_peers
 
 
 async def handle_join(ws: WebSocket, msg_data: dict, temp_peer_id: str):
@@ -17,7 +13,6 @@ async def handle_join(ws: WebSocket, msg_data: dict, temp_peer_id: str):
     clients[ws]["peer_id"] = pid
     clients[ws]["room"] = room_id
 
-    await db_save_peer(pid, nickname)
     room_history = [m for m in history if m.get("room", "global") == room_id]
     await send_json(ws, {"t": "history", "history": room_history, "peer_id": pid, "room": room_id})
     await broadcast_peers()
@@ -52,22 +47,14 @@ async def handle_msg(ws: WebSocket, msg_data: dict):
 
     if msg_data.get("cat") and msg_data.get("prio") is not None:
         cat, prio = msg_data["cat"], _parse_prio(msg_data["prio"])
-        is_threat = False
     elif plaintext:
         if msg_data.get("sos"):
-            cat, prio, is_threat = "sos", 3, False
+            cat, prio = "sos", 3
         else:
             t_res = triage_message(plaintext)
-            cat, prio, is_threat = t_res["cat"], t_res["prio"], t_res["is_threat"]
+            cat, prio = t_res["cat"], t_res["prio"]
     else:
-        cat, prio, is_threat = ("general", 0, False)
-
-    if is_threat:
-        await send_json(ws, {
-            "t": "error",
-            "text": "Message blocked by MistRoom Safety Engine: Content violates community safety standards."
-        })
-        return
+        cat, prio = ("general", 0)
 
     room_id = clients[ws].get("room", "global")
     target_dm_peer = msg_data.get("target_peer")
@@ -90,7 +77,6 @@ async def handle_msg(ws: WebSocket, msg_data: dict):
         record["is_dm"] = True
 
     history.append(record)
-    asyncio.create_task(db_save_message(mid, clients[ws]["name"], ciphertext or plaintext, iv, cat, prio))
 
     if target_dm_peer:
         for client_ws, client_info in list(clients.items()):

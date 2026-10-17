@@ -5,41 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060913">
 <title>MistRoom – Anonymous Mesh & Safety Hub</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(regs => {
-      for (const reg of regs) reg.unregister();
-    });
-  }
-  if ('caches' in window) {
-    caches.keys().then(keys => keys.forEach(key => caches.delete(key)));
-  }
-</script>
-<link rel="stylesheet" href="style.css?v=11.0">
+<link rel="stylesheet" href="style.css?v=be4efb6d">
 </head>
 <body>
 
-<!-- Ambient Liquid Mesh Glow Orbs -->
-<div class="ambient-glow-orb orb-1"></div>
-<div class="ambient-glow-orb orb-2"></div>
-<div class="ambient-glow-orb orb-3"></div>
-
-<!-- 1. JOIN MODAL (LIQUID GLASS DESIGN) -->
+<!-- 1. JOIN MODAL -->
 <div id="join-modal" class="modal-overlay">
   <div class="liquid-card join-card">
     <div class="card-specular-edge"></div>
-    
-    <div class="modal-top-actions">
-      <div class="mission-pill-bar">
-        <span class="mission-tag tag-safety">🛡️ Women Safety</span>
-        <span class="mission-tag tag-relief">🚨 Disaster SOS</span>
-        <span class="mission-tag tag-mesh">📡 Civil Mesh</span>
-      </div>
-      <button type="button" id="modal-theme-toggle-btn" class="glass-icon-btn" title="Toggle Light/Dark Theme">☀️</button>
-    </div>
 
     <div class="join-brand-header">
       <div class="liquid-brand-icon">
@@ -62,26 +35,6 @@
       </div>
       <h1>Mist<i>Room</i></h1>
       <p class="brand-tagline">Civilian Mesh • Women Protection • Disaster Triage</p>
-    </div>
-
-    <!-- Target Audience & Integrity Notice -->
-    <div class="audience-grid">
-      <div class="aud-chip">
-        <span class="aud-icon">👩</span>
-        <span>Women Safety</span>
-      </div>
-      <div class="aud-chip">
-        <span class="aud-icon">🆘</span>
-        <span>Disaster Relief</span>
-      </div>
-      <div class="aud-chip">
-        <span class="aud-icon">🎓</span>
-        <span>Students & Civil</span>
-      </div>
-      <div class="aud-chip">
-        <span class="aud-icon">🚓</span>
-        <span>Civil Responders</span>
-      </div>
     </div>
 
     <div id="join-form" class="liquid-form">
@@ -149,7 +102,6 @@
 
 <!-- 2. MAIN APPLICATION -->
 <div class="app-layout">
-  <!-- Liquid Glass Header Bar -->
   <header class="app-header glass-header">
     <div class="header-left">
       <div class="app-brand" id="brand-logo" title="MistRoom Mesh">
@@ -161,7 +113,6 @@
       </div>
       <div class="security-badges">
         <span class="badge badge-mesh" id="mesh-counter">Mesh: 0 P2P</span>
-        <span class="badge badge-mission">🛡️ Women & Civil Protection</span>
       </div>
     </div>
 
@@ -171,7 +122,6 @@
         Peers (<span id="peer-count">0</span>)
       </button>
       <button type="button" id="settings-toggle-btn" class="glass-icon-btn" title="Identity Backup & Privacy Settings">⚙️</button>
-      <button type="button" id="theme-toggle-btn" class="glass-icon-btn" title="Toggle Light/Dark Theme">☀️</button>
       <button type="button" id="logout-btn" class="glass-btn-logout" title="Leave room">Disconnect</button>
       <div class="status-indicator">
         <span class="status-dot" id="status-dot"></span>
@@ -180,14 +130,10 @@
     </div>
   </header>
 
-  <!-- Pinned Emergency Alert (SOS & Women Safety) -->
   <div id="sos-banner" class="sos-banner glass-banner" style="display:none;"></div>
 
-  <!-- Chat & Sidebar Area -->
   <div class="main-body">
-    <!-- Chat Stream -->
     <main class="chat-container">
-      <!-- Direct Message Channel Banner -->
       <div id="dm-banner" class="dm-banner glass-dm-bar" style="display:none;">
         <span class="dm-banner-icon">🔒</span>
         <div class="dm-banner-text">
@@ -195,16 +141,13 @@
         </div>
         <div class="dm-actions">
           <button type="button" id="start-voice-call-btn" class="btn-dm-call" title="Start voice call">📞 Call</button>
-          <button type="button" id="start-video-call-btn" class="btn-dm-call" title="Start video call">📹 Video</button>
           <button type="button" id="close-dm-btn" class="btn-dm-back" title="Return to room">Back</button>
         </div>
       </div>
 
       <div id="messages-list" class="messages-list" role="log" aria-live="polite"></div>
 
-      <!-- Liquid Message Input Composer -->
       <footer class="composer-container glass-composer">
-        <!-- P2P File Upload Progress Bar -->
         <div id="file-progress-container" class="file-progress-container" style="display:none;">
           <div class="file-progress-info">
             <span id="file-progress-name">Uploading encrypted file...</span>
@@ -218,14 +161,12 @@
         <form id="composer-form" class="composer-liquid-form">
           <input type="file" id="file-input" style="display:none;" />
           
-          <!-- 1. 3D P2P File Vault Button -->
           <button type="button" id="attach-file-btn" class="btn-3d-action btn-3d-file" title="Share encrypted file or photo" aria-label="Share encrypted file or photo">
             <svg class="icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
             </svg>
           </button>
 
-          <!-- 2. 3D Women's Safety Shield Emergency Button -->
           <button type="button" id="women-safety-btn" class="btn-3d-action btn-3d-shield" title="Women's Safety SOS (Auto-pins GPS & broadcasts distress)" aria-label="Women's Safety Distress">
             <svg class="icon-shield" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2L20 6V12C20 17.52 16.59 21.74 12 23C7.41 21.74 4 17.52 4 12V6L12 2Z" fill="url(#shield-btn-grad)" />
@@ -240,7 +181,6 @@
             </svg>
           </button>
 
-          <!-- Floating Glass Message Input -->
           <div class="message-input-glass-wrap">
             <input 
               id="message-input" 
@@ -251,7 +191,6 @@
             />
           </div>
 
-          <!-- 3. 3D GPS Location Button -->
           <button type="button" id="gps-btn" class="btn-3d-action btn-3d-gps" title="Attach GPS Location" aria-label="Attach GPS Location">
             <svg class="icon-gps" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2C7.58 2 4 5.58 4 10C4 15.25 12 22 12 22C12 22 20 15.25 20 10C20 5.58 16.42 2 12 2Z" fill="url(#gps-pin-grad)" />
@@ -265,7 +204,6 @@
             </svg>
           </button>
 
-          <!-- 4. 3D Faceted Origami Send Button -->
           <button type="submit" id="send-btn" class="btn-3d-action btn-3d-send" title="Send message" aria-label="Send message">
             <svg class="icon-send" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
               <polygon points="2,5 30,16 14,16" class="facet-light" />
@@ -275,7 +213,6 @@
             </svg>
           </button>
 
-          <!-- 5. 3D Crimson SOS Button -->
           <button type="button" id="sos-btn" class="btn-3d-action btn-3d-sos" title="Disaster Emergency SOS" aria-label="Disaster Emergency SOS">
             <span class="sos-3d-label">SOS</span>
           </button>
@@ -283,7 +220,6 @@
       </footer>
     </main>
 
-    <!-- Right Sidebar (Liquid Frosted Glass) -->
     <aside class="sidebar glass-sidebar" id="peers-sidebar">
       <div class="sidebar-section">
         <div class="section-header-flex">
@@ -312,7 +248,7 @@
     </aside>
   </div>
 
-  <!-- WebRTC P2P Voice & Video Call Modal -->
+  <!-- WebRTC P2P Voice Call Modal -->
   <div id="call-modal" class="call-modal" style="display:none;">
     <div class="call-modal-content liquid-card">
       <div class="call-header">
@@ -320,30 +256,25 @@
         <span id="call-timer" class="call-timer">00:00</span>
       </div>
 
-      <div id="call-video-grid" class="call-video-grid">
-        <video id="remote-video" autoplay playsinline class="remote-video"></video>
-        <video id="local-video" autoplay playsinline muted class="local-video"></video>
-        <div id="call-audio-indicator" class="call-audio-indicator" style="display:none;">
-          <div class="audio-avatar">👤</div>
-          <div id="call-status-label" class="call-status-label">Calling...</div>
-        </div>
+      <audio id="remote-audio" autoplay></audio>
+      <div id="call-audio-indicator" class="call-audio-indicator">
+        <div class="audio-avatar">👤</div>
+        <div id="call-status-label" class="call-status-label">Calling...</div>
       </div>
 
       <div class="call-controls">
         <button type="button" id="toggle-mic-btn" class="btn-call-ctrl" title="Mute/Unmute Mic">🎤</button>
-        <button type="button" id="toggle-cam-btn" class="btn-call-ctrl" title="Turn Camera On/Off">📷</button>
         <button type="button" id="hangup-call-btn" class="btn-call-ctrl btn-hangup" title="End Call">📞 Hang Up</button>
       </div>
     </div>
   </div>
 
-  <!-- Incoming Call Alert Toast -->
   <div id="incoming-call-toast" class="incoming-call-toast liquid-card" style="display:none;">
     <div class="incoming-call-info">
       <div class="incoming-avatar">📞</div>
       <div>
         <strong id="incoming-caller-name">Peer</strong>
-        <p id="incoming-call-type">Incoming encrypted call...</p>
+        <p id="incoming-call-type">Incoming voice call...</p>
       </div>
     </div>
     <div class="incoming-call-actions">
@@ -352,7 +283,6 @@
     </div>
   </div>
 
-  <!-- Settings & Identity Privacy Modal -->
   <div id="settings-modal" class="modal-overlay" style="display:none;">
     <div class="liquid-card settings-card">
       <div class="settings-modal-header">
@@ -397,6 +327,6 @@
   </div>
 </div>
 
-<script type="module" src="app.js?v=12.0"></script>
+<script type="module" src="app.js?v=487c6274"></script>
 </body>
 </html>

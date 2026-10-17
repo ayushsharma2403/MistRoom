@@ -1,9 +1,8 @@
 /**
- * WebRTC Voice & Video Calling Engine (1-on-1 P2P Calls).
+ * WebRTC Voice Calling Engine (1-on-1 P2P Voice Calls).
  */
 import { state, $ } from './state.js';
 import { RTC_CONFIG } from './mesh.js';
-import { appendSystemMessage } from './ui.js';
 
 export function startCallTimer() {
   stopCallTimer();
@@ -24,28 +23,21 @@ export function stopCallTimer() {
   }
 }
 
-export async function startCall(peer, isVideo = false) {
+export async function startCall(peer) {
   if (!peer) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return alert('Voice/video calling requires camera/microphone access in your browser.');
+    return alert('Voice calling requires microphone access in your browser.');
   }
 
   state.currentCallPeer = peer;
   try {
-    state.localMediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: isVideo ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
-    });
+    state.localMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (err) {
-    return alert(`Could not access media devices: ${err.message}`);
+    return alert(`Could not access microphone: ${err.message}`);
   }
 
-  $('call-peer-title').textContent = `${isVideo ? '📹 Video' : '📞 Voice'} Call with ${peer.name}`;
+  $('call-peer-title').textContent = `📞 Voice Call with ${peer.name}`;
   $('call-status-label').textContent = 'Calling...';
-  $('call-audio-indicator').style.display = isVideo ? 'none' : 'flex';
-  $('local-video').style.display = isVideo ? 'block' : 'none';
-  $('remote-video').style.display = isVideo ? 'block' : 'none';
-  $('local-video').srcObject = state.localMediaStream;
   $('call-modal').style.display = 'flex';
 
   state.activeCallPeerConnection = new RTCPeerConnection(RTC_CONFIG);
@@ -55,8 +47,10 @@ export async function startCall(peer, isVideo = false) {
 
   state.activeCallPeerConnection.ontrack = event => {
     $('call-status-label').textContent = 'Connected';
-    const remoteStream = event.streams[0];
-    $('remote-video').srcObject = remoteStream;
+    const remoteAudio = $('remote-audio');
+    if (remoteAudio) {
+      remoteAudio.srcObject = event.streams[0];
+    }
     startCallTimer();
   };
 
@@ -79,7 +73,6 @@ export async function startCall(peer, isVideo = false) {
       target: peer.peer_id,
       data: {
         offer,
-        isVideo,
         callerName: state.currentNickname
       }
     }));
@@ -94,7 +87,7 @@ export async function handleIncomingCallInvite(senderPeerId, senderName, data) {
   };
 
   $('incoming-caller-name').textContent = senderName;
-  $('incoming-call-type').textContent = `Incoming ${data.isVideo ? 'video' : 'voice'} call...`;
+  $('incoming-call-type').textContent = 'Incoming voice call...';
   $('incoming-call-toast').style.display = 'flex';
 }
 
@@ -104,25 +97,17 @@ export async function acceptIncomingCall() {
 
   const { peer_id, name, data } = state.pendingIncomingCall;
   state.currentCallPeer = { peer_id, name };
-  const isVideo = !!data.isVideo;
 
   try {
-    state.localMediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: isVideo ? { width: { ideal: 640 }, height: { ideal: 480 } } : false
-    });
+    state.localMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (err) {
-    alert(`Could not access microphone/camera: ${err.message}`);
+    alert(`Could not access microphone: ${err.message}`);
     declineIncomingCall();
     return;
   }
 
-  $('call-peer-title').textContent = `${isVideo ? '📹 Video' : '📞 Voice'} Call with ${name}`;
+  $('call-peer-title').textContent = `📞 Voice Call with ${name}`;
   $('call-status-label').textContent = 'Connecting...';
-  $('call-audio-indicator').style.display = isVideo ? 'none' : 'flex';
-  $('local-video').style.display = isVideo ? 'block' : 'none';
-  $('remote-video').style.display = isVideo ? 'block' : 'none';
-  $('local-video').srcObject = state.localMediaStream;
   $('call-modal').style.display = 'flex';
 
   state.activeCallPeerConnection = new RTCPeerConnection(RTC_CONFIG);
@@ -132,7 +117,10 @@ export async function acceptIncomingCall() {
 
   state.activeCallPeerConnection.ontrack = event => {
     $('call-status-label').textContent = 'Connected';
-    $('remote-video').srcObject = event.streams[0];
+    const remoteAudio = $('remote-audio');
+    if (remoteAudio) {
+      remoteAudio.srcObject = event.streams[0];
+    }
     startCallTimer();
   };
 
@@ -190,8 +178,8 @@ export function endCall(notifyRemote = true) {
 
   stopCallTimer();
   $('call-modal').style.display = 'none';
-  $('local-video').srcObject = null;
-  $('remote-video').srcObject = null;
+  const remoteAudio = $('remote-audio');
+  if (remoteAudio) remoteAudio.srcObject = null;
   state.currentCallPeer = null;
   state.pendingIncomingCall = null;
 }
@@ -203,15 +191,5 @@ export function toggleMic() {
     audioTrack.enabled = !audioTrack.enabled;
     const btn = $('toggle-mic-btn');
     if (btn) btn.classList.toggle('off', !audioTrack.enabled);
-  }
-}
-
-export function toggleCam() {
-  if (!state.localMediaStream) return;
-  const videoTrack = state.localMediaStream.getVideoTracks()[0];
-  if (videoTrack) {
-    videoTrack.enabled = !videoTrack.enabled;
-    const btn = $('toggle-cam-btn');
-    if (btn) btn.classList.toggle('off', !videoTrack.enabled);
   }
 }

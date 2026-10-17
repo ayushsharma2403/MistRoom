@@ -1,39 +1,45 @@
-"""MistRoom Backend: App creation, lifespan, and static mounting."""
+"""MistRoom Backend: App creation and static mounting."""
+import hashlib
 import json
 import time
-import asyncio
-from contextlib import asynccontextmanager
+from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import PORT, FRONTEND_DIR
-from backend.state import init_db, close_db, clients, db_remove_peer, broadcast_peers
+from backend.state import clients, broadcast_peers
 from backend.routes import router as rest_router, LAN_URL
 from backend.ws_handlers import (
     handle_join, handle_switch_room, handle_msg, handle_msg_ack,
     handle_signaling, handle_p2p_file
 )
 
+app = FastAPI(title="MistRoom")
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await init_db()
-    yield
-    await close_db()
-
-
-app = FastAPI(title="MistRoom", lifespan=lifespan)
+_INDEX_PATH = FRONTEND_DIR / "index.html"
+_INDEX_ETAG = ""
+if _INDEX_PATH.exists():
+    _INDEX_ETAG = f'"{hashlib.md5(_INDEX_PATH.read_bytes()).hexdigest()[:16]}"'
 
 
 @app.middleware("http")
-async def add_no_cache_headers(request, call_next):
+async def add_cache_headers(request, call_next):
+    path = request.url.path
+    if_none_match = request.headers.get("if-none-match")
+
     response = await call_next(request)
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    if request.url.path in ("/", "/index.html"):
-        response.headers["Clear-Site-Data"] = '"cache"'
+
+    if path in ("/", "/index.html"):
+        response.headers["Cache-Control"] = "no-cache"
+        if _INDEX_ETAG:
+            response.headers["ETag"] = _INDEX_ETAG
+            if if_none_match == _INDEX_ETAG:
+                response.status_code = 304
+    elif path.startswith("/assets/") or (len(Path(path).stem.split(".")) > 1):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 
 
@@ -77,9 +83,7 @@ async def websocket_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
-        client_info = clients.pop(ws, None)
-        if client_info and client_info.get("peer_id"):
-            asyncio.create_task(db_remove_peer(client_info["peer_id"]))
+        clients.pop(ws, None)
         await broadcast_peers()
 
 

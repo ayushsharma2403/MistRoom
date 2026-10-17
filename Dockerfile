@@ -10,8 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
-COPY init.sql .
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["python", "-m", "backend.server"]

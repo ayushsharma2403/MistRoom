@@ -17,7 +17,6 @@ export function getStatusIcon(status) {
   switch (status) {
     case 'queued': return '🕒 Queued';
     case 'delivered': return '✓ Delivered';
-    case 'read': return '✓✓ Read';
     case 'sent':
     default:
       return '⬆️ Sent';
@@ -283,11 +282,6 @@ export function renderAvailableRooms(rooms, switchRoomCb) {
 export async function sendMessage(rawText, isSOS = false) {
   if (!rawText) return;
   const triage = isSOS ? { cat: 'sos', prio: 3 } : triageText(rawText);
-
-  if (triage.isThreat) {
-    alert('⚠️ Message Blocked: Content violates MistRoom community safety standards (anti-terror, non-violence & anti-theft policy).');
-    return;
-  }
 
   const effectiveSOS = isSOS || triage.cat === 'sos' || triage.cat === 'women_safety';
   const mid = 'm_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);

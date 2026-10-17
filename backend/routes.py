@@ -4,7 +4,6 @@ import socket
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from backend.config import PORT
-from backend.state import db_pool
 
 try:
     import segno
@@ -53,18 +52,6 @@ def get_qr_svg(request: Request):
     return Response(svg_fallback, media_type="image/svg+xml")
 
 
-@router.get("/reset-cache")
-def reset_cache():
-    """Wipes all browser cache, service workers, and storage for this origin."""
-    response = Response(
-        content='''<!DOCTYPE html><html><head><meta http-equiv="refresh" content="1;url=/"><title>Resetting Cache...</title></head><body style="font-family:sans-serif;background:#0B132B;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="text-align:center;"><h2>Clearing Browser Cache & Service Workers...</h2><p>Redirecting to fresh MistRoom in 1 second...</p></div></body></html>''',
-        media_type="text/html"
-    )
-    response.headers["Clear-Site-Data"] = '"cache", "cookies", "storage"'
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    return response
-
-
 @router.get("/api/info")
 def get_info():
-    return JSONResponse({"url": LAN_URL, "db_active": db_pool is not None})
+    return JSONResponse({"url": LAN_URL})

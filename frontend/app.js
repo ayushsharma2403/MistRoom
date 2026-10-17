@@ -11,7 +11,7 @@ import {
 import { sendEncryptedFile } from './js/files.js';
 import {
   startCall, acceptIncomingCall, declineIncomingCall,
-  endCall, toggleMic, toggleCam
+  endCall, toggleMic
 } from './js/calls.js';
 import { setupSettingsUI } from './js/settings.js';
 import { connectWebSocket } from './js/ws.js';
@@ -20,7 +20,6 @@ export function switchRoom(newRoom) {
   if (!newRoom) return;
   state.currentRoom = newRoom.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'global';
   $('active-room-badge').textContent = `#${state.currentRoom}`;
-  $('room-switcher-bar').style.display = 'none';
 
   appendSystemMessage(`Switched to room: #${state.currentRoom}`);
 
@@ -54,22 +53,6 @@ async function handleJoin() {
   connectWebSocket(switchRoom);
 }
 
-function updateThemeButtons(theme) {
-  const icon = theme === 'light' ? '🌙' : '☀️';
-  const themeBtn = $('theme-toggle-btn');
-  const modalThemeBtn = $('modal-theme-toggle-btn');
-  if (themeBtn) themeBtn.textContent = icon;
-  if (modalThemeBtn) modalThemeBtn.textContent = icon;
-}
-
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme') || 'dark';
-  const nextTheme = current === 'light' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', nextTheme);
-  localStorage.setItem('mistroom_theme', nextTheme);
-  updateThemeButtons(nextTheme);
-}
-
 document.addEventListener('DOMContentLoaded', () => {
   initIndexedDB();
 
@@ -87,16 +70,12 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(res => res.json())
     .then(data => {
       const urlText = data.url || `${location.protocol}//${location.host}`;
-      const modalDisplay = $('lan-url-display');
       const sideDisplay = $('lan-url-display-sidebar');
-      if (modalDisplay) modalDisplay.textContent = urlText;
       if (sideDisplay) sideDisplay.textContent = urlText;
     })
     .catch(() => {
       const fallback = `${location.protocol}//${location.host}`;
-      const modalDisplay = $('lan-url-display');
       const sideDisplay = $('lan-url-display-sidebar');
-      if (modalDisplay) modalDisplay.textContent = fallback;
       if (sideDisplay) sideDisplay.textContent = fallback;
     });
 
@@ -132,17 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const switchHeaderBtn = $('switch-room-header-btn');
-  if (switchHeaderBtn) {
-    switchHeaderBtn.addEventListener('click', () => {
-      const bar = $('room-switcher-bar');
-      bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
-      if (bar.style.display === 'block') {
-        $('quick-room-input').focus();
-      }
-    });
-  }
-
   const quickRoomBtn = $('quick-room-btn');
   if (quickRoomBtn) {
     quickRoomBtn.addEventListener('click', () => {
@@ -161,10 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  document.querySelectorAll('.room-chip').forEach(chip => {
-    chip.addEventListener('click', () => switchRoom(chip.dataset.room));
-  });
-
   const attachFileBtn = $('attach-file-btn');
   const fileInput = $('file-input');
   if (attachFileBtn && fileInput) {
@@ -179,17 +143,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const startVoiceCallBtn = $('start-voice-call-btn');
-  const startVideoCallBtn = $('start-video-call-btn');
   if (startVoiceCallBtn) {
     startVoiceCallBtn.addEventListener('click', () => {
       if (!state.activeDirectPeer) return alert('Select a peer to start a call.');
-      startCall(state.activeDirectPeer, false);
-    });
-  }
-  if (startVideoCallBtn) {
-    startVideoCallBtn.addEventListener('click', () => {
-      if (!state.activeDirectPeer) return alert('Select a peer to start a call.');
-      startCall(state.activeDirectPeer, true);
+      startCall(state.activeDirectPeer);
     });
   }
 
@@ -197,13 +154,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const declineCallBtn = $('decline-call-btn');
   const hangupCallBtn = $('hangup-call-btn');
   const toggleMicBtn = $('toggle-mic-btn');
-  const toggleCamBtn = $('toggle-cam-btn');
 
   if (acceptCallBtn) acceptCallBtn.addEventListener('click', acceptIncomingCall);
   if (declineCallBtn) declineCallBtn.addEventListener('click', declineIncomingCall);
   if (hangupCallBtn) hangupCallBtn.addEventListener('click', () => endCall(true));
   if (toggleMicBtn) toggleMicBtn.addEventListener('click', toggleMic);
-  if (toggleCamBtn) toggleCamBtn.addEventListener('click', toggleCam);
 
   $('composer-form').addEventListener('submit', e => {
     e.preventDefault();
@@ -263,15 +218,6 @@ document.addEventListener('DOMContentLoaded', () => {
       { timeout: 8000, enableHighAccuracy: true }
     );
   });
-
-  const themeBtn = $('theme-toggle-btn');
-  const modalThemeBtn = $('modal-theme-toggle-btn');
-  const savedTheme = localStorage.getItem('mistroom_theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-  document.documentElement.setAttribute('data-theme', savedTheme);
-  updateThemeButtons(savedTheme);
-
-  if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
-  if (modalThemeBtn) modalThemeBtn.addEventListener('click', toggleTheme);
 
   const logoutBtn = $('logout-btn');
   if (logoutBtn) {
