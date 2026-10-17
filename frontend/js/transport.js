@@ -161,8 +161,13 @@ export class Router {
     }
     // Fallback to WebSocket relay if connected
     const ws = this.transports.get('ws');
-    if (ws) {
-      return await ws.send(peerId, packet);
+    if (ws && await ws.send(peerId, packet)) {
+      return true;
+    }
+    // Fallback to BLE
+    const ble = this.transports.get('ble');
+    if (ble && ble.capabilities.available) {
+      return await ble.send(peerId, packet);
     }
     return false;
   }
@@ -170,22 +175,38 @@ export class Router {
   async broadcast(packet) {
     this.markSeen(packet.id);
     let delivered = false;
+    const isBeacon = packet.t === 'beacon' || packet.cat === 'women_safety' || packet.cat === 'sos';
 
-    // Send over P2P mesh
-    const rtc = this.transports.get('webrtc');
-    if (rtc) {
-      const p2pSent = await rtc.broadcast(packet);
-      if (p2pSent) delivered = true;
+    if (isBeacon) {
+      // Rule 8: Send BEACONs on ALL transports simultaneously
+      for (const [, transport] of this.transports) {
+        try {
+          if (transport.capabilities.available !== false) {
+            const sent = await transport.broadcast(packet);
+            if (sent) delivered = true;
+          }
+        } catch (e) {}
+      }
+      return delivered;
     }
 
-    // Send over WebSocket if available
+    // DATA priority: RTC data channel > WebSocket > BLE
+    const rtc = this.transports.get('webrtc');
+    if (rtc && await rtc.broadcast(packet)) {
+      return true;
+    }
+
     const ws = this.transports.get('ws');
     if (ws && state.ws && state.ws.readyState === WebSocket.OPEN) {
-      const wsSent = await ws.broadcast(packet);
-      if (wsSent) delivered = true;
+      if (await ws.broadcast(packet)) return true;
     }
 
-    return delivered;
+    const ble = this.transports.get('ble');
+    if (ble && ble.capabilities.available) {
+      return await ble.broadcast(packet);
+    }
+
+    return false;
   }
 
   async routeIncoming(packet, sourcePeerId, sourceTransportId) {
@@ -229,7 +250,10 @@ export class Router {
   }
 }
 
+import { BleTransport } from './ble/transport_ble.js';
+
 // Global router singleton
 export const router = new Router();
 router.registerTransport(new WsTransport());
 router.registerTransport(new RtcTransport());
+router.registerTransport(new BleTransport());

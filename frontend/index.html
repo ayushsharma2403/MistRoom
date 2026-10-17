@@ -414,6 +414,24 @@
       </div>
 
       <div class="settings-section">
+        <h3>📶 Bluetooth Mesh (BLE)</h3>
+        <div class="setting-toggle-row">
+          <div>
+            <strong>BLE Mesh Relay</strong>
+            <p class="settings-hint">Direct local device-to-device hopping without Wi-Fi.</p>
+          </div>
+          <input type="checkbox" id="ble-mesh-toggle" class="setting-checkbox" />
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;">
+          <span>Status: <strong id="ble-mesh-status">Inactive</strong></span>
+          <span>Neighbors: <strong id="ble-neighbor-count">0</strong></span>
+        </div>
+        <p class="settings-hint" style="margin-top:6px;color:#f59e0b;">
+          ⚠️ Needs the Android/iOS app (native Bluetooth peripheral and background mesh support).
+        </p>
+      </div>
+
+      <div class="settings-section">
         <h3>🏅 Trusted Authorities & Responder Badges</h3>
         <p class="settings-hint">Add authority public keys to verify responder badges. Import your signed responder badge if you are a verified medic/volunteer.</p>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
