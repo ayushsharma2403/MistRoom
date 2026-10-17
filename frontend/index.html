@@ -142,6 +142,7 @@
         <span class="badge badge-room" id="active-room-badge">#global</span>
       </div>
       <span id="ghost-chip" class="badge" style="display:none;background:rgba(217,70,239,0.2);color:#f472b6;border:1px solid rgba(217,70,239,0.4);font-size:11px;padding:3px 8px;border-radius:99px;">👻 Ghost on</span>
+      <span id="safewalk-chip" class="badge" style="display:none;background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-size:11px;padding:3px 8px;border-radius:99px;cursor:pointer;" title="Tap to view / Long-press for duress SOS">🚶 Safe Walk: --:--</span>
       <div class="security-badges">
         <span class="badge badge-mesh" id="mesh-counter">Mesh: 0 P2P</span>
       </div>
@@ -221,6 +222,12 @@
               +
             </button>
             <div id="composer-plus-dropdown" class="liquid-card" style="display:none;position:absolute;left:0;bottom:100%;margin-bottom:8px;min-width:180px;z-index:999;padding:6px;flex-direction:column;gap:4px;">
+              <button type="button" id="safewalk-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(245,158,11,0.15);border:none;color:#fbbf24;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:700;">
+                🚶 Safe Walk Timer
+              </button>
+              <button type="button" id="incident-log-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(239,71,111,0.15);border:none;color:#f87171;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:700;">
+                📝 Report Incident Log
+              </button>
               <button type="button" id="women-safety-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(217,70,239,0.15);border:none;color:#f472b6;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;">
                 🛡️ Women Safety
               </button>
@@ -407,6 +414,22 @@
       </div>
 
       <div class="settings-section">
+        <h3>🏅 Trusted Authorities & Responder Badges</h3>
+        <p class="settings-hint">Add authority public keys to verify responder badges. Import your signed responder badge if you are a verified medic/volunteer.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+          <input type="text" id="add-auth-name-input" placeholder="Authority Name (e.g. Red Cross, Delhi Camp 4)" style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;font-size:12px;" />
+          <input type="text" id="add-auth-pk-input" placeholder="Authority Ed25519 Public Key (Base64)" style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;font-size:12px;" />
+          <button type="button" id="btn-add-auth" class="btn-action-sm" style="padding:6px;background:rgba(6,214,160,0.2);color:var(--primary);border:1px solid rgba(6,214,160,0.4);">+ Add Trusted Authority</button>
+          
+          <div style="margin-top:10px;">
+            <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Import My Responder Badge (JSON):</label>
+            <textarea id="import-badge-input" rows="2" placeholder='{"v":1,"issuer_name":"...","role":"medic"...}' style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;font-size:11px;font-family:var(--font-mono);resize:none;margin-top:4px;"></textarea>
+            <button type="button" id="btn-save-badge" class="btn-action-sm" style="margin-top:4px;padding:6px;background:rgba(255,255,255,0.1);color:#fff;">Save Badge</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <h3>🚫 Blocked Peers</h3>
         <p class="settings-hint">Packets and calls from blocked peer IDs are silently dropped.</p>
         <ul id="blocked-peers-list" class="blocked-items">
@@ -417,6 +440,10 @@
       <div class="settings-section danger-zone">
         <h3>🚨 Emergency Panic Data Wipe</h3>
         <p class="settings-hint">Instantly obliterates all local cipher stores, IndexedDB outbox queues, room keys, and cache from this browser.</p>
+        <div style="margin:8px 0;display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="wipe-include-log-checkbox" />
+          <label for="wipe-include-log-checkbox" style="font-size:12px;color:#fca5a5;font-weight:600;">Include incident evidence log (WARNING: irrecoverably destroys legal evidence)</label>
+        </div>
         <button type="button" id="panic-wipe-btn" class="btn-panic-wipe">⚠️ Wipe Everything & Reset</button>
       </div>
     </div>
@@ -496,6 +523,92 @@
           <button type="button" id="btn-sl-confirm" class="btn-liquid-enter" style="flex:1;justify-content:center;background:#06D6A0;color:#060913;">✓ Codes Match</button>
           <button type="button" id="btn-sl-cancel" class="btn-action-sm" style="flex:1;background:rgba(239,71,111,0.2);color:#ef4444;border:1px solid rgba(239,71,111,0.4);">✗ Mismatch</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Safe Walk Setup Modal -->
+  <div id="safewalk-modal" class="modal-overlay" style="display:none;">
+    <div class="liquid-card" style="max-width:440px;width:100%;padding:24px;">
+      <div class="settings-modal-header" style="margin-bottom:12px;">
+        <h3>🚶 Start Safe Walk Timer</h3>
+        <button type="button" id="close-safewalk-btn" class="btn-close-modal">&times;</button>
+      </div>
+      <p class="settings-hint" style="margin-bottom:16px;">
+        If you don't check in before the timer expires, an emergency alert with your last 10 GPS breadcrumbs is automatically dispatched.
+        <br><strong style="color:#fbbf24;">Note:</strong> Page must remain open while walking.
+      </p>
+      <div class="form-group-glass">
+        <label for="safewalk-duration">Duration</label>
+        <select id="safewalk-duration" style="width:100%;padding:10px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;">
+          <option value="5">5 Minutes</option>
+          <option value="10" selected>10 Minutes</option>
+          <option value="15">15 Minutes</option>
+          <option value="30">30 Minutes</option>
+          <option value="60">60 Minutes</option>
+        </select>
+      </div>
+      <div class="form-group-glass" style="margin-top:12px;">
+        <label for="safewalk-destination">Destination / Safety Note (Optional)</label>
+        <input type="text" id="safewalk-destination" placeholder="e.g. Walking home from metro station..." style="width:100%;padding:10px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;" />
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button type="button" id="btn-start-safewalk" class="btn-liquid-enter" style="flex:1;justify-content:center;background:#F59E0B;color:#060913;">
+          Start Timer & Tracking
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Safe Walk T-60 Warning Banner -->
+  <div id="safewalk-warn-banner" class="glass-banner" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(239,71,111,0.95);border:2px solid #fff;border-radius:14px;padding:12px 20px;display:none;flex-direction:column;align-items:center;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+    <strong style="font-size:15px;color:#fff;">⚠️ Safe Walk Expiring in 60s! Are you safe?</strong>
+    <div style="display:flex;gap:10px;">
+      <button type="button" id="btn-safewalk-safe" class="btn-action-sm" style="background:#06D6A0;color:#060913;font-weight:800;padding:8px 14px;">I'm Safe (Stop)</button>
+      <button type="button" id="btn-safewalk-extend" class="btn-action-sm" style="background:rgba(255,255,255,0.2);color:#fff;padding:8px 14px;">+5 Min</button>
+    </div>
+  </div>
+
+  <!-- Incident Harassment Log Modal -->
+  <div id="incident-log-modal" class="modal-overlay" style="display:none;">
+    <div class="liquid-card" style="max-width:500px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">
+      <div class="settings-modal-header" style="margin-bottom:12px;">
+        <h3>📝 Tamper-Evident Harassment Log</h3>
+        <button type="button" id="close-incident-btn" class="btn-close-modal">&times;</button>
+      </div>
+      <p class="settings-hint">Entries are signed with your Ed25519 identity and hash-chained in IndexedDB to serve as admissible evidence.</p>
+
+      <form id="incident-form" style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Category</label>
+          <select id="incident-cat" style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;margin-top:4px;">
+            <option value="stalking">Stalking / Following</option>
+            <option value="verbal">Verbal Harassment / Threat</option>
+            <option value="physical">Physical Assault / Grabbing</option>
+            <option value="transport">Cab / Public Transit Incident</option>
+            <option value="online">Online Harassment</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Incident Details</label>
+          <textarea id="incident-text" rows="3" placeholder="Describe what happened, vehicle numbers, perpetrator appearance..." style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;font-size:13px;resize:none;margin-top:4px;"></textarea>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Attach Photo Evidence (<= 5MB, stays local)</label>
+          <input type="file" id="incident-photo" accept="image/*" style="width:100%;color:#94a3b8;font-size:12px;margin-top:4px;" />
+        </div>
+        <button type="submit" class="btn-liquid-enter" style="justify-content:center;background:#ef4444;color:#fff;">
+          🔒 Sign & Append to Hash-Chain
+        </button>
+      </form>
+
+      <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:14px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="btn-verify-log" class="btn-action-sm" style="flex:1;background:rgba(6,214,160,0.15);color:var(--primary);border:1px solid rgba(6,214,160,0.3);padding:8px;">🔍 Verify Chain Integrity</button>
+          <button type="button" id="btn-export-log" class="btn-action-sm" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:8px;">📦 Export Bundle (.json)</button>
+        </div>
+        <div id="incident-verify-result" style="font-size:12px;font-weight:600;display:none;"></div>
       </div>
     </div>
   </div>

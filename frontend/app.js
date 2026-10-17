@@ -25,6 +25,12 @@ import {
   resetActiveBootstrap
 } from './js/bootstrap.js';
 import { router } from './js/transport.js';
+import {
+  startSafeWalk, extendSafeWalk, stopSafeWalk, triggerSafeWalkAlert
+} from './js/safewalk.js';
+import {
+  addIncidentLogEntry, verifyIncidentLog, exportIncidentLogBundle
+} from './js/harassment_log.js';
 
 export function switchRoom(newRoom) {
   if (!newRoom) return;
@@ -397,6 +403,133 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Safe Walk Setup & Handlers
+  const safewalkBtn = $('safewalk-btn');
+  const safewalkModal = $('safewalk-modal');
+  const closeSafewalkBtn = $('close-safewalk-btn');
+  const startSafewalkBtn = $('btn-start-safewalk');
+
+  if (safewalkBtn) {
+    safewalkBtn.addEventListener('click', () => {
+      if (composerPlusDropdown) composerPlusDropdown.style.display = 'none';
+      if (safewalkModal) safewalkModal.style.display = 'flex';
+    });
+  }
+  if (closeSafewalkBtn) {
+    closeSafewalkBtn.addEventListener('click', () => {
+      if (safewalkModal) safewalkModal.style.display = 'none';
+    });
+  }
+  if (startSafewalkBtn) {
+    startSafewalkBtn.addEventListener('click', () => {
+      const dur = parseInt($('safewalk-duration')?.value || '10', 10);
+      const note = ($('safewalk-destination')?.value || '').trim();
+      startSafeWalk(dur, note);
+      if (safewalkModal) safewalkModal.style.display = 'none';
+    });
+  }
+
+  $('btn-safewalk-safe')?.addEventListener('click', () => {
+    stopSafeWalk();
+    appendSystemMessage('✅ Safe walk finished: Checked in safely.');
+  });
+
+  $('btn-safewalk-extend')?.addEventListener('click', () => {
+    extendSafeWalk(5);
+  });
+
+  // Duress trigger on long-press of Safe Walk chip
+  const safewalkChip = $('safewalk-chip');
+  if (safewalkChip) {
+    let pressTimer = null;
+    safewalkChip.addEventListener('pointerdown', () => {
+      pressTimer = setTimeout(() => {
+        triggerSafeWalkAlert();
+        appendSystemMessage('🚨 DURESS SOS TRIGGERED manually from Safe Walk chip!');
+      }, 1500);
+    });
+    safewalkChip.addEventListener('pointerup', () => {
+      if (pressTimer) clearTimeout(pressTimer);
+    });
+    safewalkChip.addEventListener('pointercancel', () => {
+      if (pressTimer) clearTimeout(pressTimer);
+    });
+  }
+
+  // Incident Harassment Log Handlers
+  const incidentLogBtn = $('incident-log-btn');
+  const incidentModal = $('incident-log-modal');
+  const closeIncidentBtn = $('close-incident-btn');
+  const incidentForm = $('incident-form');
+
+  if (incidentLogBtn) {
+    incidentLogBtn.addEventListener('click', () => {
+      if (composerPlusDropdown) composerPlusDropdown.style.display = 'none';
+      if (incidentModal) incidentModal.style.display = 'flex';
+    });
+  }
+  if (closeIncidentBtn) {
+    closeIncidentBtn.addEventListener('click', () => {
+      if (incidentModal) incidentModal.style.display = 'none';
+    });
+  }
+  if (incidentForm) {
+    incidentForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const cat = $('incident-cat')?.value || 'other';
+      const text = ($('incident-text')?.value || '').trim();
+      const photoFile = $('incident-photo')?.files?.[0] || null;
+
+      if (!text && !photoFile) return;
+
+      let lat = null, lon = null;
+      if (navigator.geolocation) {
+        await new Promise(res => {
+          navigator.geolocation.getCurrentPosition(
+            p => { lat = p.coords.latitude; lon = p.coords.longitude; res(); },
+            () => res(),
+            { timeout: 3000 }
+          );
+        });
+      }
+
+      await addIncidentLogEntry({ text, cat, lat, lon, photoBlob: photoFile });
+      $('incident-text').value = '';
+      if ($('incident-photo')) $('incident-photo').value = '';
+      if (incidentModal) incidentModal.style.display = 'none';
+      appendSystemMessage('🔒 Incident securely recorded & signed in tamper-evident chain.');
+    });
+  }
+
+  $('btn-verify-log')?.addEventListener('click', async () => {
+    const res = await verifyIncidentLog();
+    const resultDiv = $('incident-verify-result');
+    if (resultDiv) {
+      resultDiv.style.display = 'block';
+      if (res.ok) {
+        resultDiv.style.color = '#34d399';
+        resultDiv.textContent = `✓ Chain valid: All ${res.count} entries verified cryptographically.`;
+      } else {
+        resultDiv.style.color = '#ef4444';
+        resultDiv.textContent = `✗ Integrity broken at entry #${res.brokenIndex}: ${res.reason}`;
+      }
+    }
+  });
+
+  $('btn-export-log')?.addEventListener('click', async () => {
+    const bundle = await exportIncidentLogBundle();
+    const jsonStr = JSON.stringify(bundle, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `incident_evidence_bundle_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    appendSystemMessage('📦 Incident evidence bundle exported.');
+  });
+
 
   const attachFileBtn = $('attach-file-btn');
   const fileInput = $('file-input');

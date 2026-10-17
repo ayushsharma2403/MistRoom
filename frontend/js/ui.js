@@ -11,6 +11,7 @@ import { queueOfflineMessage } from './outbox.js';
 import { blockPeer, unblockPeer } from './settings.js';
 import { isSafePreviewMime } from './files.js';
 import { router } from './transport.js';
+import { getMyBadge, verifyBadge } from './badges.js';
 
 export function resolveNeed(id) {
   state.openNeeds.delete(id);
@@ -336,6 +337,33 @@ export function appendMessageToUI(msg, autoScroll = true) {
     meta.append(verifiedDot);
   }
 
+  // Responder badge display
+  if (msg.badge) {
+    const badgeRes = verifyBadge(msg.badge, msg.pk);
+    const badgeChip = document.createElement('span');
+    badgeChip.style.fontSize = '10px';
+    badgeChip.style.padding = '2px 6px';
+    badgeChip.style.borderRadius = '4px';
+    badgeChip.style.fontWeight = '700';
+
+    if (badgeRes.status === 'verified') {
+      badgeChip.style.background = 'rgba(16,185,129,0.2)';
+      badgeChip.style.color = '#34d399';
+      badgeChip.style.border = '1px solid rgba(16,185,129,0.4)';
+      badgeChip.textContent = `✓ ${badgeRes.badge.role} (${badgeRes.badge.issuer_name})`;
+    } else if (badgeRes.status === 'revoked') {
+      badgeChip.style.background = 'rgba(239,71,111,0.2)';
+      badgeChip.style.color = '#ef4444';
+      badgeChip.style.border = '1px solid rgba(239,71,111,0.4)';
+      badgeChip.textContent = '❌ Revoked Badge';
+    } else {
+      badgeChip.style.background = 'rgba(148,163,184,0.2)';
+      badgeChip.style.color = '#94a3b8';
+      badgeChip.textContent = 'Unverified Badge';
+    }
+    meta.append(badgeChip);
+  }
+
   if (isDM) {
     const dmTag = document.createElement('span');
     dmTag.className = 'dm-tag';
@@ -615,6 +643,11 @@ export async function sendMessage(rawText, explicitCat = null) {
     prio: triage.prio,
     ts
   };
+
+  const myBadge = getMyBadge();
+  if (myBadge) {
+    payload.badge = myBadge;
+  }
 
   if (state.activeDirectPeer) {
     payload.target_peer = state.activeDirectPeer.peer_id;

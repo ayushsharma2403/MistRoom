@@ -252,6 +252,13 @@ export function signResolveNeed(id) {
   return bytesToBase64(sigBytes);
 }
 
+export function signGenericSig(dataStr) {
+  if (!state.identity || !state.identity.privKey) return '';
+  const data = new TextEncoder().encode(dataStr);
+  const sigBytes = ed25519.sign(data, state.identity.privKey);
+  return bytesToBase64(sigBytes);
+}
+
 export function verifyGenericSig(dataStr, sigB64, pkB64) {
   try {
     const pkBytes = base64ToBytes(pkB64);

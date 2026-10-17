@@ -4,6 +4,8 @@
 import { state, $ } from './state.js';
 import { appendSystemMessage, renderPeers } from './ui.js';
 import { DB_NAME } from './outbox.js';
+import { LOG_DB_NAME } from './harassment_log.js';
+import { addTrustedAuthority, setMyBadge, getMyBadge } from './badges.js';
 
 export const WORDLIST = [
   'alpha', 'beacon', 'cipher', 'delta', 'echo', 'falcon', 'ghost', 'harbor',
@@ -211,10 +213,47 @@ export function setupSettingsUI() {
     });
   }
 
+  // Trusted Authority & Responder Badge Wiring
+  const addAuthBtn = $('btn-add-auth');
+  if (addAuthBtn) {
+    addAuthBtn.addEventListener('click', () => {
+      const name = ($('add-auth-name-input').value || '').trim();
+      const pk = ($('add-auth-pk-input').value || '').trim();
+      if (!pk) return;
+      addTrustedAuthority(name, pk);
+      $('add-auth-name-input').value = '';
+      $('add-auth-pk-input').value = '';
+      appendSystemMessage(`🏅 Trusted authority added: ${name || 'Authority'} (${pk.substring(0, 8)}...)`);
+    });
+  }
+
+  const saveBadgeBtn = $('btn-save-badge');
+  if (saveBadgeBtn) {
+    saveBadgeBtn.addEventListener('click', () => {
+      const val = ($('import-badge-input').value || '').trim();
+      if (!val) return;
+      try {
+        const badge = JSON.parse(val);
+        setMyBadge(badge);
+        appendSystemMessage(`✓ Responder badge saved for role: ${badge.role}`);
+      } catch (e) {
+        alert('Invalid badge JSON');
+      }
+    });
+  }
+
   if (panicWipeBtn) {
     panicWipeBtn.addEventListener('click', () => {
-      if (confirm('🚨 EMERGENCY WIPE: Are you sure? This will delete all encrypted outbox messages, recovery keys, and history immediately.')) {
+      const wipeLog = $('wipe-include-log-checkbox')?.checked;
+      const warning = wipeLog
+        ? '🚨 EMERGENCY WIPE INCLUDING INCIDENT EVIDENCE LOG: Are you absolutely sure? This will destroy all messages, encryption keys, AND your legal evidence log.'
+        : '🚨 EMERGENCY WIPE: Are you sure? This will delete all encrypted outbox messages, recovery keys, and history. (Incident evidence log will be preserved).';
+
+      if (confirm(warning)) {
         try { window.indexedDB.deleteDatabase(DB_NAME); } catch (e) {}
+        if (wipeLog) {
+          try { window.indexedDB.deleteDatabase(LOG_DB_NAME); } catch (e) {}
+        }
         sessionStorage.clear();
         localStorage.clear();
         location.reload();

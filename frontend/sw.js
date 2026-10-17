@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mistroom-v2-cache-20261017-offline-p2p';
+const CACHE_NAME = 'mistroom-v2-cache-20261017-v3';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -13,6 +13,9 @@ const PRECACHE_ASSETS = [
   '/js/crypto.js',
   '/js/transport.js',
   '/js/bootstrap.js',
+  '/js/safewalk.js',
+  '/js/badges.js',
+  '/js/harassment_log.js',
   '/js/triage.js',
   '/js/mesh.js',
   '/js/files.js',
