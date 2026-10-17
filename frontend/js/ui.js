@@ -10,6 +10,7 @@ import {
 import { queueOfflineMessage } from './outbox.js';
 import { blockPeer, unblockPeer } from './settings.js';
 import { isSafePreviewMime } from './files.js';
+import { router } from './transport.js';
 
 export function resolveNeed(id) {
   state.openNeeds.delete(id);
@@ -619,34 +620,16 @@ export async function sendMessage(rawText, explicitCat = null) {
     payload.target_peer = state.activeDirectPeer.peer_id;
   }
 
-  let p2pCount = 0;
+  // Route through unified Router
+  let delivered = false;
   if (state.activeDirectPeer) {
-    const targetPeer = state.meshPeers.get(state.activeDirectPeer.peer_id);
-    if (targetPeer && targetPeer.dc && targetPeer.dc.readyState === 'open') {
-      try {
-        targetPeer.dc.send(JSON.stringify(payload));
-        p2pCount = 1;
-      } catch (e) { }
-    }
+    delivered = await router.send(state.activeDirectPeer.peer_id, payload);
   } else {
-    for (const [, peer] of state.meshPeers) {
-      if (peer.dc && peer.dc.readyState === 'open') {
-        try {
-          peer.dc.send(JSON.stringify(payload));
-          p2pCount++;
-        } catch (e) { }
-      }
-    }
-  }
-
-  let sentViaRelay = false;
-  if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-    state.ws.send(JSON.stringify(payload));
-    sentViaRelay = true;
+    delivered = await router.broadcast(payload);
   }
 
   let initialStatus = 'sent';
-  if (!sentViaRelay && p2pCount === 0) {
+  if (!delivered) {
     initialStatus = 'queued';
     queueOfflineMessage(payload);
     appendSystemMessage('📦 Message queued in offline outbox. Will auto-relay when connected.');
@@ -667,7 +650,7 @@ export async function sendMessage(rawText, explicitCat = null) {
     status: initialStatus,
     verified: true,
     expected_peers: state.currentPeersList.filter(p => p.peer_id !== state.myPeerId).length,
-    route: p2pCount > 0 ? (state.activeDirectPeer ? 'P2P Direct' : `P2P Mesh (${p2pCount})`) : (sentViaRelay ? 'Relay' : 'Offline Outbox')
+    route: delivered ? (state.activeDirectPeer ? 'P2P Direct' : 'Mesh Broadcast') : 'Offline Outbox'
   };
   state.messagesHistory.push(localMessage);
   appendMessageToUI(localMessage);

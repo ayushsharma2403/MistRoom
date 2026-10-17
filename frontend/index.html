@@ -7,6 +7,8 @@
 <title>MistRoom – Anonymous Mesh & Safety Hub</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="style.css?v=be4efb6d">
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/jsqr.js"></script>
 </head>
 <body>
 
@@ -95,7 +97,10 @@
           <span class="btn-liquid-text">Enter Secure Mesh</span>
           <span class="btn-liquid-arrow">→</span>
         </button>
-        <button type="button" id="restore-phrase-btn" class="btn-action-sm" style="margin-top:10px;width:100%;background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1);">
+        <button type="button" id="serverless-join-btn" class="btn-action-sm" style="margin-top:10px;width:100%;background:rgba(6,214,160,0.15);color:var(--primary);border:1px solid rgba(6,214,160,0.3);font-weight:700;">
+          ⚡ Connect without Server (QR / P2P)
+        </button>
+        <button type="button" id="restore-phrase-btn" class="btn-action-sm" style="margin-top:8px;width:100%;background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1);">
           🔑 Restore from Recovery Phrase
         </button>
       </div>
@@ -155,6 +160,7 @@
         <button type="button" id="header-more-btn" class="glass-icon-btn" title="More options" aria-label="Menu">⋯</button>
         <div id="header-dropdown-menu" class="liquid-card" style="display:none;position:absolute;right:0;top:100%;margin-top:6px;min-width:160px;z-index:999;padding:6px;flex-direction:column;gap:4px;">
           <button type="button" id="menu-settings-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">⚙️ Settings</button>
+          <button type="button" id="menu-serverless-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:var(--primary);padding:8px;font-size:13px;border-radius:6px;cursor:pointer;font-weight:700;">⚡ Offline QR Connect</button>
           <button type="button" id="menu-needs-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">📋 Needs Board</button>
           <button type="button" id="menu-mesh-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">⚡ Mesh Info</button>
           <div style="height:1px;background:rgba(255,255,255,0.1);margin:4px 0;"></div>
@@ -435,14 +441,62 @@
     </div>
   </div>
 
-  <!-- Beacon List Details Modal -->
-  <div id="beacon-list-modal" class="modal-overlay" style="display:none;">
-    <div class="liquid-card" style="max-width:500px;max-height:80vh;overflow-y:auto;padding:20px;">
-      <div class="settings-modal-header" style="margin-bottom:16px;">
-        <h3>🚨 Active Public Beacons</h3>
-        <button type="button" id="close-beacon-list-btn" class="btn-close-modal">&times;</button>
+  <!-- Serverless Offline QR / Text P2P Pairing Modal -->
+  <div id="serverless-modal" class="modal-overlay" style="display:none;">
+    <div class="liquid-card" style="max-width:480px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">
+      <div class="settings-modal-header" style="margin-bottom:12px;">
+        <h3>⚡ Connect Without Server (Offline P2P)</h3>
+        <button type="button" id="close-serverless-btn" class="btn-close-modal">&times;</button>
       </div>
-      <div id="active-beacons-container" style="display:flex;flex-direction:column;gap:10px;"></div>
+      <p class="settings-hint" style="margin-bottom:16px;">
+        Connect directly to another phone over local Wi-Fi / hotspot with zero server relay. Exchange offer and answer via QR code or text.
+      </p>
+
+      <!-- Step selection: Host or Join -->
+      <div id="serverless-role-select" style="display:flex;gap:10px;margin-bottom:16px;">
+        <button type="button" id="btn-sl-start" class="btn-liquid-enter" style="flex:1;justify-content:center;font-size:13px;padding:12px 8px;">
+          1. Start (Show Offer)
+        </button>
+        <button type="button" id="btn-sl-join" class="btn-action-sm" style="flex:1;justify-content:center;font-size:13px;padding:12px 8px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);">
+          2. Join (Scan Offer)
+        </button>
+      </div>
+
+      <!-- Step A: Initiator Screen -->
+      <div id="sl-initiator-view" style="display:none;">
+        <h4 style="font-size:13px;color:var(--primary);margin-bottom:8px;">Device A: Offer Code</h4>
+        <div id="sl-offer-qr" style="background:#fff;padding:12px;border-radius:12px;display:flex;justify-content:center;align-items:center;min-height:180px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button type="button" id="btn-copy-offer" class="btn-action-sm" style="flex:1;padding:8px;background:rgba(255,255,255,0.1);color:#fff;">📋 Copy Offer Text</button>
+        </div>
+        <p class="settings-hint">Now paste the Answer from Device B below:</p>
+        <textarea id="sl-answer-input" rows="3" placeholder="Paste Device B answer here..." style="width:100%;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;padding:10px;font-family:var(--font-mono);font-size:11px;resize:none;margin-bottom:8px;"></textarea>
+        <button type="button" id="btn-submit-answer" class="btn-liquid-enter" style="width:100%;justify-content:center;padding:10px;">Accept Answer</button>
+      </div>
+
+      <!-- Step B: Responder Screen -->
+      <div id="sl-responder-view" style="display:none;">
+        <h4 style="font-size:13px;color:var(--primary);margin-bottom:8px;">Device B: Paste Offer</h4>
+        <textarea id="sl-offer-input" rows="3" placeholder="Paste Device A offer here..." style="width:100%;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;padding:10px;font-family:var(--font-mono);font-size:11px;resize:none;margin-bottom:8px;"></textarea>
+        <button type="button" id="btn-submit-offer" class="btn-liquid-enter" style="width:100%;justify-content:center;padding:10px;margin-bottom:12px;">Generate Answer</button>
+
+        <div id="sl-answer-display-box" style="display:none;">
+          <h4 style="font-size:13px;color:var(--primary);margin-bottom:8px;">Device B: Answer Code</h4>
+          <div id="sl-answer-qr" style="background:#fff;padding:12px;border-radius:12px;display:flex;justify-content:center;align-items:center;min-height:180px;margin-bottom:10px;"></div>
+          <button type="button" id="btn-copy-answer" class="btn-action-sm" style="width:100%;padding:8px;background:rgba(255,255,255,0.1);color:#fff;margin-bottom:8px;">📋 Copy Answer Text</button>
+        </div>
+      </div>
+
+      <!-- Step C: Pairing Code Verification Screen -->
+      <div id="sl-verify-view" style="display:none;text-align:center;padding-top:10px;">
+        <h4 style="color:#fff;margin-bottom:6px;">Confirm Security Code</h4>
+        <p class="settings-hint">Read aloud this 6-digit confirmation code. If both devices show the same code, no MITM exists.</p>
+        <div id="sl-pairing-code-badge" style="font-family:var(--font-mono);font-size:28px;font-weight:900;letter-spacing:4px;color:var(--primary);margin:16px 0;background:rgba(6,214,160,0.1);padding:12px;border-radius:12px;border:1px solid rgba(6,214,160,0.3);">------</div>
+        <div style="display:flex;gap:10px;">
+          <button type="button" id="btn-sl-confirm" class="btn-liquid-enter" style="flex:1;justify-content:center;background:#06D6A0;color:#060913;">✓ Codes Match</button>
+          <button type="button" id="btn-sl-cancel" class="btn-action-sm" style="flex:1;background:rgba(239,71,111,0.2);color:#ef4444;border:1px solid rgba(239,71,111,0.4);">✗ Mismatch</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

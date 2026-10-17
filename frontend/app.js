@@ -19,6 +19,12 @@ import {
   renderPeers, renderAvailableRooms, updateBeaconBanner, renderBeaconListModal,
   renderNeedsBoard, renderMeshTopology
 } from './js/ui.js';
+import {
+  startServerlessInitiator, processOfferAndCreateAnswer,
+  processAnswerOnInitiator, confirmPairing, renderQrCodeTo,
+  resetActiveBootstrap
+} from './js/bootstrap.js';
+import { router } from './js/transport.js';
 
 export function switchRoom(newRoom) {
   if (!newRoom) return;
@@ -248,6 +254,14 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    const menuServerlessBtn = $('menu-serverless-btn');
+    if (menuServerlessBtn) {
+      menuServerlessBtn.addEventListener('click', () => {
+        headerDropdownMenu.style.display = 'none';
+        $('serverless-join-btn')?.click();
+      });
+    }
+
     const menuLogoutBtn = $('menu-logout-btn');
     if (menuLogoutBtn) {
       menuLogoutBtn.addEventListener('click', () => {
@@ -256,6 +270,116 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   }
+
+  // Serverless P2P Offline Pairing Modal Wiring
+  const serverlessModal = $('serverless-modal');
+  const serverlessJoinBtn = $('serverless-join-btn');
+  const closeServerlessBtn = $('close-serverless-btn');
+
+  function openServerlessModal() {
+    if (!state.identity) {
+      getOrCreateIdentity().then(id => {
+        state.identity = id;
+        state.myPeerId = id.peerId;
+      });
+    }
+    if (serverlessModal) serverlessModal.style.display = 'flex';
+    $('sl-initiator-view').style.display = 'none';
+    $('sl-responder-view').style.display = 'none';
+    $('sl-verify-view').style.display = 'none';
+    $('serverless-role-select').style.display = 'flex';
+  }
+
+  if (serverlessJoinBtn) serverlessJoinBtn.addEventListener('click', openServerlessModal);
+  if (closeServerlessBtn) closeServerlessBtn.addEventListener('click', () => {
+    resetActiveBootstrap();
+    if (serverlessModal) serverlessModal.style.display = 'none';
+  });
+
+  // Step 1: Start (Initiator)
+  $('btn-sl-start')?.addEventListener('click', async () => {
+    $('serverless-role-select').style.display = 'none';
+    $('sl-initiator-view').style.display = 'block';
+    const qrContainer = $('sl-offer-qr');
+    qrContainer.textContent = 'Generating offer...';
+    try {
+      const { encodedStr } = await startServerlessInitiator();
+      renderQrCodeTo(qrContainer, encodedStr);
+      $('btn-copy-offer').onclick = () => {
+        navigator.clipboard?.writeText(encodedStr);
+        appendSystemMessage('Offer text copied to clipboard.');
+      };
+    } catch (e) {
+      qrContainer.textContent = 'Error: ' + e.message;
+    }
+  });
+
+  // Accept Answer on Initiator
+  $('btn-submit-answer')?.addEventListener('click', async () => {
+    const val = ($('sl-answer-input').value || '').trim();
+    if (!val) return;
+    try {
+      const { pairingCode } = await processAnswerOnInitiator(val);
+      $('sl-initiator-view').style.display = 'none';
+      $('sl-verify-view').style.display = 'block';
+      $('sl-pairing-code-badge').textContent = pairingCode;
+    } catch (e) {
+      alert('Failed to process answer: ' + e.message);
+    }
+  });
+
+  // Step 2: Join (Responder)
+  $('btn-sl-join')?.addEventListener('click', () => {
+    $('serverless-role-select').style.display = 'none';
+    $('sl-responder-view').style.display = 'block';
+  });
+
+  // Generate Answer on Responder
+  $('btn-submit-offer')?.addEventListener('click', async () => {
+    const val = ($('sl-offer-input').value || '').trim();
+    if (!val) return;
+    try {
+      const { encodedStr, pairingCode } = await processOfferAndCreateAnswer(val);
+      $('sl-answer-display-box').style.display = 'block';
+      const qrContainer = $('sl-answer-qr');
+      renderQrCodeTo(qrContainer, encodedStr);
+      $('btn-copy-answer').onclick = () => {
+        navigator.clipboard?.writeText(encodedStr);
+        appendSystemMessage('Answer text copied to clipboard.');
+      };
+      // Show verify screen with code
+      setTimeout(() => {
+        $('sl-responder-view').style.display = 'none';
+        $('sl-verify-view').style.display = 'block';
+        $('sl-pairing-code-badge').textContent = pairingCode;
+      }, 4000);
+    } catch (e) {
+      alert('Failed to process offer: ' + e.message);
+    }
+  });
+
+  // Confirmation of match
+  $('btn-sl-confirm')?.addEventListener('click', async () => {
+    confirmPairing();
+    if (serverlessModal) serverlessModal.style.display = 'none';
+    // If not joined yet, unlock the chat interface in serverless room
+    if (!state.cryptoKey) {
+      state.currentNickname = state.currentNickname || 'OfflinePeer';
+      state.currentRoom = 'offline-mesh';
+      state.cryptoKey = await deriveEncryptionKey('serverless-mesh-key', state.currentRoom);
+      $('join-modal').style.display = 'none';
+      $('active-room-badge').textContent = '#offline-mesh';
+      $('status-dot').className = 'status-dot online';
+      $('status-text').textContent = 'P2P Direct';
+    }
+  });
+
+  $('btn-sl-cancel')?.addEventListener('click', () => {
+    resetActiveBootstrap();
+    if (serverlessModal) serverlessModal.style.display = 'none';
+    appendSystemMessage('⚠️ P2P pairing cancelled due to security code mismatch.');
+  });
+
 
   // Composer Plus (+) menu
   const composerPlusBtn = $('composer-plus-btn');

@@ -27,6 +27,12 @@ export function base64ToBytes(b64) {
   return bytes;
 }
 
+export { sha256 };
+
+export function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 const B32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
 
 export function bytesToBase32(bytes) {
