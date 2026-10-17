@@ -21,6 +21,25 @@
   --safety-glow: rgba(217, 70, 239, 0.4);
   --sos: #EF476F;
   --border: rgba(255, 255, 255, 0.1);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background: var(--bg-main);
+  background-image: var(--bg-mesh);
+  color: var(--text-main);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 @media (prefers-color-scheme: light) {
@@ -1244,14 +1263,177 @@
   color: #FFFFFF;
 }
 
-@media (max-width: 768px) {
-  .sidebar {
-    display: none;
-    position: fixed;
-    right: 0;
-    top: 55px;
-    bottom: 0;
-    z-index: 50;
-    width: 280px;
+/* Drop blur and reduce motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
+
+@media (max-width: 640px) {
+  * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  
+  body, html {
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
+  }
+
+  .app-container {
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  /* Header compact collapse */
+  .glass-header {
+    padding: 8px 10px;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+
+  .header-left {
+    gap: 6px;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .brand-name {
+    font-size: 15px;
+  }
+
+  .badge-room {
+    max-width: 85px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 2px 6px;
+  }
+
+  .desk-only {
+    display: none !important;
+  }
+
+  .mobile-only {
+    display: inline-flex !important;
+  }
+
+  .header-right {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Compact action menu */
+  .header-dropdown-menu {
+    position: absolute;
+    top: 50px;
+    right: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    min-width: 160px;
+  }
+
+  .dropdown-item {
+    text-align: left;
+    width: 100%;
+    justify-content: flex-start;
+    padding: 10px 14px;
+    font-size: 13px;
+    min-height: 44px;
+  }
+
+  /* Bottom sheet for sidebar on mobile */
+  .glass-sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    width: 100%;
+    max-height: 70vh;
+    border-radius: 20px 20px 0 0;
+    border-left: none;
+    border-top: 2px solid var(--border);
+    background: var(--bg-card);
+    z-index: 500;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Composer mobile responsiveness: input >= 60% width, min 44px touch targets */
+  .glass-composer {
+    padding: 8px 10px;
+  }
+
+  .composer-liquid-form {
+    gap: 6px;
+    width: 100%;
+  }
+
+  .message-input-glass-wrap {
+    flex: 1 1 60%;
+    min-width: 60%;
+  }
+
+  .message-input-glass-wrap input {
+    padding: 11px 12px;
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .btn-3d-action {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 12px;
+  }
+
+  .btn-3d-sos {
+    min-width: 52px;
+    min-height: 44px;
+    padding: 0 10px;
+  }
+
+  .composer-expand-menu {
+    position: absolute;
+    bottom: 60px;
+    left: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+  }
+
+  .composer-expand-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-main);
+    font-size: 13px;
+    font-weight: 700;
+    min-height: 44px;
+    cursor: pointer;
+  }
+}
+

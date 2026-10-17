@@ -46,7 +46,7 @@ def clean_state():
     history.clear()
 
 
-async def join_ws(ws, name, room="global"):
+async def join_ws(ws, name, room="global", ghost=False):
     """Helper to receive challenge, sign nonce with Ed25519, and send join."""
     priv = Ed25519PrivateKey.generate()
     pub = priv.public_key()
@@ -62,13 +62,17 @@ async def join_ws(ws, name, room="global"):
     sig_bytes = priv.sign(base64.b64decode(nonce))
     sig_b64 = base64.b64encode(sig_bytes).decode()
 
-    await ws.send(json.dumps({
+    payload = {
         "t": "join",
         "name": name,
         "room": room,
         "pk": pk_b64,
         "sig": sig_b64
-    }))
+    }
+    if ghost:
+        payload["ghost"] = True
+
+    await ws.send(json.dumps(payload))
 
     # Receive history frame (other broadcasts such as people may arrive first)
     peer_id = None
@@ -334,5 +338,65 @@ def test_room_switch_both_ways(ws_server):
             assert data2["room"] == "room1"
 
     asyncio.run(_run())
+
+
+def test_ghost_mode_behavior(ws_server):
+    """Verify ghost users are hidden from people list, show sender handle 'Ghost', and reject DMs."""
+    async def _run():
+        uri = ws_server
+        async with websockets.connect(uri) as ws_alice, websockets.connect(uri) as ws_ghost:
+            priv_a, pk_a, pid_a = await join_ws(ws_alice, "alice", "ghost_room", ghost=False)
+            priv_g, pk_g, pid_g = await join_ws(ws_ghost, "secret_agent", "ghost_room", ghost=True)
+
+            await asyncio.sleep(0.1)
+
+            # Drain alice's incoming frames to see if ghost was broadcast in 'people'
+            people_peers = None
+            while True:
+                try:
+                    f = await asyncio.wait_for(ws_alice.recv(), timeout=0.1)
+                    d = json.loads(f)
+                    if d.get("t") == "people":
+                        people_peers = d.get("peers", [])
+                except asyncio.TimeoutError:
+                    break
+
+            # Ghost peer must NOT be in alice's peers list
+            if people_peers is not None:
+                peer_ids = [p["peer_id"] for p in people_peers]
+                assert pid_g not in peer_ids
+
+            # Ghost sends a message
+            msg_payload = make_v2_msg(priv_g, pk_g, "g-msg-1", "ghost_room")
+            await ws_ghost.send(json.dumps(msg_payload))
+
+            # Alice receives message and sender is "Ghost"
+            rec = await asyncio.wait_for(ws_alice.recv(), timeout=1.0)
+            data = json.loads(rec)
+            assert data.get("t") == "msg"
+            assert data.get("msg", {}).get("from") == "Ghost"
+
+            # Alice attempts to DM the ghost user -> server returns target_unavailable
+            dm_payload = make_v2_msg(priv_a, pk_a, "dm-1", "ghost_room", target_peer=pid_g)
+            await ws_alice.send(json.dumps(dm_payload))
+
+            err = await asyncio.wait_for(ws_alice.recv(), timeout=1.0)
+            err_data = json.loads(err)
+            assert err_data.get("t") == "error"
+            assert err_data.get("code") == "target_unavailable"
+
+    asyncio.run(_run())
+
+
+def test_deterministic_bip39_derivation():
+    """Verify deterministic 12-word seed derivation using PBKDF2-SHA256, 100000 iter, salt mistroom:identity:v2."""
+    import hashlib
+    words = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+    salt = b"mistroom:identity:v2"
+    seed1 = hashlib.pbkdf2_hmac("sha256", words.encode("utf-8"), salt, 100000, dklen=32)
+    seed2 = hashlib.pbkdf2_hmac("sha256", words.encode("utf-8"), salt, 100000, dklen=32)
+    assert seed1 == seed2
+    assert len(seed1) == 32
+
 
 

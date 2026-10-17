@@ -48,16 +48,20 @@ export function connectWebSocket(onSwitchRoom) {
         console.debug('Missing challenge nonce or client identity');
         return;
       }
-      const sigB64 = signChallengeNonce(data.nonce, state.identity.privateKey);
-      const pkB64 = bytesToBase64(state.identity.publicKey);
+      const sigB64 = signChallenge(data.nonce);
+      const pkB64 = bytesToBase64(state.identity.pubKey);
       state.ws.send(JSON.stringify({
         t: 'join',
-        name: state.isStealthMode ? 'Anonymous' : state.currentNickname,
+        name: state.isStealthMode ? 'Ghost' : state.currentNickname,
         room: state.currentRoom,
         pk: pkB64,
-        sig: sigB64
+        sig: sigB64,
+        ghost: state.isStealthMode
       }));
       $('status-text').textContent = 'Online';
+
+      // 5. Flush outbox after join handshake completes
+      import('./outbox.js').then(o => o.flushOfflineOutbox());
       return;
     }
 
@@ -113,6 +117,12 @@ export function connectWebSocket(onSwitchRoom) {
         m.verified = isVerified;
         state.messagesHistory.push(m);
         appendMessageToUI(m, false);
+      }
+
+      // 6. Server restart: when the server comes back, clients re-join, re-derive nothing,
+      // and the user sees "Server restarted: earlier history is gone, local messages kept".
+      if (incomingHistory.length === 0 && state.messagesHistory.some(m => !m.is_system && m.status !== 'queued')) {
+        import('./ui.js').then(u => u.appendSystemMessage('⚠️ Server restarted: earlier history is gone, local messages kept.'));
       }
 
       // Sort chronological

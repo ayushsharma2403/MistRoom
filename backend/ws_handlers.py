@@ -62,6 +62,7 @@ class JoinModel(BaseModel):
     room: str = Field(default="global", min_length=1, max_length=30)
     pk: str
     sig: str
+    ghost: Optional[bool] = False
 
 
 class SwitchRoomModel(BaseModel):
@@ -166,10 +167,11 @@ async def handle_join_v2(ws: WebSocket, msg_data: dict, challenge_nonce: str):
                 pass
             clients.pop(other_ws, None)
 
-    clients[ws]["name"] = name
+    clients[ws]["name"] = "Ghost" if parsed.ghost else name
     clients[ws]["peer_id"] = peer_id
     clients[ws]["room"] = room
     clients[ws]["pk"] = parsed.pk
+    clients[ws]["ghost"] = bool(parsed.ghost)
 
     # Per-room history (never include DMs)
     room_hist = get_room_history(room)
@@ -246,12 +248,13 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
         return
 
     current_room = clients[ws]["room"]
-    display_name = format_displayed_handle(clients[ws]["name"], sender_peer_id, current_room)
+    is_ghost = clients[ws].get("ghost", False)
+    display_name = "Ghost" if is_ghost else format_displayed_handle(clients[ws]["name"], sender_peer_id, current_room)
 
-    # Calculate count of other peers in the room at send time for delivery ticks
+    # Calculate count of other non-ghost peers in the room at send time for delivery ticks
     room_peer_count = sum(
         1 for cl in clients.values()
-        if cl.get("room") == current_room and cl.get("peer_id") != sender_peer_id
+        if cl.get("room") == current_room and cl.get("peer_id") != sender_peer_id and not cl.get("ghost", False)
     )
 
     record = {
@@ -269,6 +272,12 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
     }
 
     if parsed.target_peer:
+        # Ghost cannot appear as a DM target: reject DMs targeting a ghost user
+        target_info = next((cl for cl in clients.values() if cl.get("peer_id") == parsed.target_peer), None)
+        if target_info and target_info.get("ghost", False):
+            await send_json(ws, {"t": "error", "code": "target_unavailable"})
+            return
+
         record["target_peer"] = parsed.target_peer
         record["is_dm"] = True
         # Deliver only to sender and target; never store in history

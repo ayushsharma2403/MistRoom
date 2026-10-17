@@ -2,7 +2,7 @@
  * WebRTC Voice Calling Engine (1-on-1 P2P Voice Calls).
  */
 import { state, $ } from './state.js';
-import { RTC_CONFIG } from './mesh.js';
+import { getRtcConfig } from './mesh.js';
 
 export function startCallTimer() {
   stopCallTimer();
@@ -40,7 +40,7 @@ export async function startCall(peer) {
   $('call-status-label').textContent = 'Calling...';
   $('call-modal').style.display = 'flex';
 
-  state.activeCallPeerConnection = new RTCPeerConnection(RTC_CONFIG);
+  state.activeCallPeerConnection = new RTCPeerConnection(getRtcConfig());
   state.localMediaStream.getTracks().forEach(track => {
     state.activeCallPeerConnection.addTrack(track, state.localMediaStream);
   });
@@ -122,7 +122,7 @@ export async function acceptIncomingCall() {
   $('call-status-label').textContent = 'Connecting...';
   $('call-modal').style.display = 'flex';
 
-  state.activeCallPeerConnection = new RTCPeerConnection(RTC_CONFIG);
+  state.activeCallPeerConnection = new RTCPeerConnection(getRtcConfig());
   state.localMediaStream.getTracks().forEach(track => {
     state.activeCallPeerConnection.addTrack(track, state.localMediaStream);
   });

@@ -2,7 +2,9 @@
  * MistRoom Application Root: wires ES modules, sets up event listeners.
  */
 import { state, $ } from './js/state.js';
-import { deriveEncryptionKey, getOrCreateIdentity } from './js/crypto.js';
+import {
+  deriveEncryptionKey, getOrCreateIdentity, restoreIdentityFromPhrase
+} from './js/crypto.js';
 import { initIndexedDB, flushOfflineOutbox } from './js/outbox.js';
 import { initTriageRules } from './js/triage.js';
 import { connectWebSocket } from './js/ws.js';
@@ -71,6 +73,9 @@ async function handleJoin() {
 
   $('active-room-badge').textContent = `#${state.currentRoom}`;
   state.cryptoKey = await deriveEncryptionKey(state.currentPasskey, state.currentRoom);
+
+  const ghostChip = $('ghost-chip');
+  if (ghostChip) ghostChip.style.display = state.isStealthMode ? 'inline-flex' : 'none';
 
   $('join-modal').style.display = 'none';
   connectWebSocket(switchRoom);
@@ -153,10 +158,129 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Restore from recovery phrase modal
+  const restorePhraseBtn = $('restore-phrase-btn');
+  const restoreModal = $('restore-modal');
+  const closeRestoreBtn = $('close-restore-btn');
+  const submitRestoreBtn = $('submit-restore-btn');
+  const restoreInput = $('restore-phrase-input');
+  const restoreError = $('restore-error');
+
+  if (restorePhraseBtn && restoreModal) {
+    restorePhraseBtn.addEventListener('click', () => {
+      restoreModal.style.display = 'flex';
+      if (restoreError) restoreError.style.display = 'none';
+      if (restoreInput) {
+        restoreInput.value = '';
+        setTimeout(() => restoreInput.focus(), 50);
+      }
+    });
+  }
+
+  if (closeRestoreBtn && restoreModal) {
+    closeRestoreBtn.addEventListener('click', () => {
+      restoreModal.style.display = 'none';
+    });
+  }
+
+  if (submitRestoreBtn && restoreInput) {
+    submitRestoreBtn.addEventListener('click', async () => {
+      const phrase = restoreInput.value.trim();
+      try {
+        const identity = await restoreIdentityFromPhrase(phrase);
+        state.identity = identity;
+        state.myPeerId = identity.peerId;
+        restoreModal.style.display = 'none';
+        appendSystemMessage(`✅ Successfully restored identity (Peer ID: ${identity.peerId}). You can now enter the mesh.`);
+      } catch (err) {
+        if (restoreError) {
+          restoreError.style.display = 'block';
+          restoreError.textContent = err.message || 'Invalid 12-word recovery phrase.';
+        }
+      }
+    });
+  }
+
+  // Header ⋯ dropdown menu
+  const headerMoreBtn = $('header-more-btn');
+  const headerDropdownMenu = $('header-dropdown-menu');
+  if (headerMoreBtn && headerDropdownMenu) {
+    headerMoreBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const isVisible = headerDropdownMenu.style.display === 'flex';
+      headerDropdownMenu.style.display = isVisible ? 'none' : 'flex';
+    });
+
+    document.addEventListener('click', e => {
+      if (!headerMoreBtn.contains(e.target) && !headerDropdownMenu.contains(e.target)) {
+        headerDropdownMenu.style.display = 'none';
+      }
+    });
+
+    const menuSettingsBtn = $('menu-settings-btn');
+    if (menuSettingsBtn) {
+      menuSettingsBtn.addEventListener('click', () => {
+        headerDropdownMenu.style.display = 'none';
+        const modal = $('settings-modal');
+        if (modal) {
+          $('settings-toggle-btn')?.click();
+        }
+      });
+    }
+
+    const menuNeedsBtn = $('menu-needs-btn');
+    if (menuNeedsBtn) {
+      menuNeedsBtn.addEventListener('click', () => {
+        headerDropdownMenu.style.display = 'none';
+        const sb = $('peers-sidebar');
+        if (sb) sb.style.display = 'flex';
+        $('tab-btn-needs')?.click();
+      });
+    }
+
+    const menuMeshBtn = $('menu-mesh-btn');
+    if (menuMeshBtn) {
+      menuMeshBtn.addEventListener('click', () => {
+        headerDropdownMenu.style.display = 'none';
+        const sb = $('peers-sidebar');
+        if (sb) sb.style.display = 'flex';
+        $('tab-btn-mesh')?.click();
+      });
+    }
+
+    const menuLogoutBtn = $('menu-logout-btn');
+    if (menuLogoutBtn) {
+      menuLogoutBtn.addEventListener('click', () => {
+        headerDropdownMenu.style.display = 'none';
+        $('logout-btn')?.click();
+      });
+    }
+  }
+
+  // Composer Plus (+) menu
+  const composerPlusBtn = $('composer-plus-btn');
+  const composerPlusDropdown = $('composer-plus-dropdown');
+  if (composerPlusBtn && composerPlusDropdown) {
+    composerPlusBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const isVisible = composerPlusDropdown.style.display === 'flex';
+      composerPlusDropdown.style.display = isVisible ? 'none' : 'flex';
+    });
+
+    document.addEventListener('click', e => {
+      if (!composerPlusBtn.contains(e.target) && !composerPlusDropdown.contains(e.target)) {
+        composerPlusDropdown.style.display = 'none';
+      }
+    });
+  }
+
   const attachFileBtn = $('attach-file-btn');
   const fileInput = $('file-input');
   if (attachFileBtn && fileInput) {
-    attachFileBtn.addEventListener('click', () => fileInput.click());
+    attachFileBtn.addEventListener('click', () => {
+      if (composerPlusDropdown) composerPlusDropdown.style.display = 'none';
+      fileInput.click();
+    });
     fileInput.addEventListener('change', () => {
       const file = fileInput.files?.[0];
       if (file) {
@@ -226,6 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const input = $('message-input');
       const customNote = input.value.trim();
       input.value = '';
+      if (composerPlusDropdown) composerPlusDropdown.style.display = 'none';
 
       const consent = await promptBeaconConsentIfNeeded();
 
@@ -348,6 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tabBtnMesh) tabBtnMesh.addEventListener('click', () => selectTab('mesh'));
 
   $('gps-btn').addEventListener('click', () => {
+    if (composerPlusDropdown) composerPlusDropdown.style.display = 'none';
     if (!navigator.geolocation) {
       return appendSystemMessage('Geolocation is not supported by your device.');
     }
@@ -369,6 +495,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const logoutBtn = $('logout-btn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
+      // 4. Logout: reset everything: activeDirectPeer, DM banner, SOS banner, mesh peers, call state, in-memory keys, message list, outbox in-memory references.
+      closeDirectChat();
+      endCall(false);
+
+      const sosBanner = $('sos-banner');
+      if (sosBanner) sosBanner.style.display = 'none';
+
+      const beaconBanner = $('beacon-banner');
+      if (beaconBanner) beaconBanner.style.display = 'none';
+
       for (const [, peer] of state.meshPeers) {
         try {
           if (peer.dc) peer.dc.close();
@@ -383,12 +519,16 @@ document.addEventListener('DOMContentLoaded', () => {
         state.ws = null;
       }
 
+      state.activeDirectPeer = null;
       state.currentNickname = '';
       state.currentPasskey = '';
       state.currentRoom = 'global';
       state.cryptoKey = null;
       state.messagesHistory.length = 0;
       state.currentPeersList = [];
+      state.activeBeacons.clear();
+      state.openNeeds.clear();
+      state.messageAcks.clear();
 
       $('messages-list').textContent = '';
       $('peers-list').textContent = '';
@@ -413,4 +553,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const sb = $('peers-sidebar');
     sb.style.display = sb.style.display === 'flex' ? '' : 'flex';
   });
+
+  // Service Worker registration with update prompt
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              appendSystemMessage('Update available. Reload to apply newest version.');
+            }
+          });
+        });
+      } catch (err) {
+        console.warn('[SW] Registration failed:', err);
+      }
+    });
+  }
 });
+

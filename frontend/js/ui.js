@@ -569,7 +569,7 @@ export async function sendPublicBeacon(cat, prio, shortText, coords = null) {
     lat: coords ? coords.lat : null,
     lon: coords ? coords.lon : null,
     accuracy: coords ? coords.accuracy : null,
-    handle: state.isStealthMode ? 'Anonymous' : state.currentNickname,
+    handle: state.isStealthMode ? 'Ghost' : state.currentNickname,
     ts
   };
 
@@ -652,9 +652,10 @@ export async function sendMessage(rawText, explicitCat = null) {
     appendSystemMessage('📦 Message queued in offline outbox. Will auto-relay when connected.');
   }
 
+  const senderHandle = state.isStealthMode ? 'Ghost' : state.currentNickname;
   const localMessage = {
     id: mid,
-    from: state.currentNickname,
+    from: senderHandle,
     peer_id: state.myPeerId,
     room: state.currentRoom,
     target_peer: payload.target_peer,

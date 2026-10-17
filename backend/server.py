@@ -41,19 +41,23 @@ async def add_security_headers(request, call_next):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self'; "
+        "worker-src 'self'; "
         "style-src 'self'; "
         "img-src 'self' blob: data:; "
         "connect-src 'self' ws: wss:; "
         "media-src 'self' blob:; "
+        "manifest-src 'self'; "
         "object-src 'none'; "
         "base-uri 'none'"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
 
-    if path in ("/", "/index.html"):
+    if path in ("/", "/index.html", "/sw.js"):
         response.headers["Cache-Control"] = "no-cache"
-        if _INDEX_ETAG:
+        if path == "/sw.js":
+            response.headers["Service-Worker-Allowed"] = "/"
+        if _INDEX_ETAG and path in ("/", "/index.html"):
             response.headers["ETag"] = _INDEX_ETAG
             if if_none_match == _INDEX_ETAG:
                 response.status_code = 304

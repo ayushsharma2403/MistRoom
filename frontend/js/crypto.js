@@ -59,7 +59,96 @@ export function deriveRoomKey(passkey, roomName) {
   return pbkdf2(sha256, passwordBytes, salt, { c: 600000, dkLen: 32 });
 }
 
+let cachedWordlist = null;
+
+export async function loadWordlist() {
+  if (cachedWordlist) return cachedWordlist;
+  try {
+    const res = await fetch('/vendor/wordlist.txt');
+    const text = await res.text();
+    const words = text.trim().split(/\s+/);
+    if (words.length === 2048) {
+      cachedWordlist = words;
+      return words;
+    }
+  } catch (e) {
+    console.debug('Failed to load wordlist:', e);
+  }
+  return null;
+}
+
+export function generate12WordPhrase(words) {
+  if (!words || words.length !== 2048) throw new Error('Valid 2048-wordlist required');
+  const entropy = new Uint8Array(16); // 128 bits
+  crypto.getRandomValues(entropy);
+
+  // 12 words: 128 bits + 4 bits checksum = 132 bits = 12 * 11 bits
+  const hash = sha256(entropy);
+  const checksum = hash[0] >> 4; // 4 bits
+
+  let bits = '';
+  for (let i = 0; i < 16; i++) {
+    bits += entropy[i].toString(2).padStart(8, '0');
+  }
+  bits += checksum.toString(2).padStart(4, '0');
+
+  const phraseWords = [];
+  for (let i = 0; i < 12; i++) {
+    const idx = parseInt(bits.slice(i * 11, (i + 1) * 11), 2);
+    phraseWords.push(words[idx]);
+  }
+  return phraseWords.join(' ');
+}
+
+export function validate12WordPhrase(phrase, words) {
+  if (!phrase || typeof phrase !== 'string') return false;
+  const parts = phrase.trim().toLowerCase().split(/\s+/);
+  if (parts.length !== 12) return false;
+  const wordSet = new Set(words);
+  return parts.every(w => wordSet.has(w));
+}
+
+export function deriveIdentityFromPhrase(phrase) {
+  const enc = new TextEncoder();
+  const phraseBytes = enc.encode(phrase.trim().toLowerCase());
+  const salt = enc.encode('mistroom:identity:v2');
+  const seed = pbkdf2(sha256, phraseBytes, salt, { c: 100000, dkLen: 32 });
+
+  const privKey = seed;
+  const pubKey = ed25519.getPublicKey(privKey);
+  const peerId = derivePeerIdFromPk(pubKey);
+
+  return { privKey, pubKey, peerId, phrase: phrase.trim().toLowerCase() };
+}
+
+export async function restoreIdentityFromPhrase(phrase) {
+  const words = await loadWordlist();
+  if (!words || !validate12WordPhrase(phrase, words)) {
+    throw new Error('Invalid 12-word recovery phrase');
+  }
+  const identity = deriveIdentityFromPhrase(phrase);
+
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onsuccess = e => {
+      const db = e.target.result;
+      const tx = db.transaction(ID_STORE, 'readwrite');
+      const store = tx.objectStore(ID_STORE);
+      store.put({
+        key: 'ed25519_identity',
+        privKey: identity.privKey,
+        pubKey: identity.pubKey,
+        phrase: identity.phrase
+      });
+      tx.oncomplete = () => resolve(identity);
+      tx.onerror = () => reject(tx.error);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function getOrCreateIdentity() {
+  const words = await loadWordlist();
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = e => {
@@ -81,17 +170,29 @@ export async function getOrCreateIdentity() {
           resolve({
             privKey: getReq.result.privKey,
             pubKey: getReq.result.pubKey,
-            peerId: derivePeerIdFromPk(getReq.result.pubKey)
+            peerId: derivePeerIdFromPk(getReq.result.pubKey),
+            phrase: getReq.result.phrase || null
           });
         } else {
-          const privKey = ed25519.utils.randomPrivateKey();
-          const pubKey = ed25519.getPublicKey(privKey);
-          store.put({ key: 'ed25519_identity', privKey, pubKey });
+          let phrase = null;
+          let privKey;
+          let pubKey;
+          if (words) {
+            phrase = generate12WordPhrase(words);
+            const derived = deriveIdentityFromPhrase(phrase);
+            privKey = derived.privKey;
+            pubKey = derived.pubKey;
+          } else {
+            privKey = ed25519.utils.randomPrivateKey();
+            pubKey = ed25519.getPublicKey(privKey);
+          }
+          store.put({ key: 'ed25519_identity', privKey, pubKey, phrase });
           tx.oncomplete = () => {
             resolve({
               privKey,
               pubKey,
-              peerId: derivePeerIdFromPk(pubKey)
+              peerId: derivePeerIdFromPk(pubKey),
+              phrase
             });
           };
         }

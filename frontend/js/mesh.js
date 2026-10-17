@@ -9,9 +9,15 @@ import {
 } from './ui.js';
 import { handleIncomingFilePacket } from './files.js';
 
-export const RTC_CONFIG = {
-  iceServers: []
-};
+export function getRtcConfig() {
+  if (state.customIceServers) {
+    const urls = state.customIceServers.split(',').map(s => s.trim()).filter(Boolean);
+    if (urls.length > 0) {
+      return { iceServers: [{ urls }] };
+    }
+  }
+  return { iceServers: [] }; // Default: no external STUN (host-only / local LAN)
+}
 
 export function updateMeshBadge() {
   const activeCount = Array.from(state.meshPeers.values())
@@ -155,7 +161,7 @@ export function attachDataChannelEvents(dc, targetPeerId) {
 
 export function initWebRTCPeer(targetPeerId, isInitiator) {
   if (state.meshPeers.has(targetPeerId)) return;
-  const pc = new RTCPeerConnection(RTC_CONFIG);
+  const pc = new RTCPeerConnection(getRtcConfig());
   state.meshPeers.set(targetPeerId, { pc, dc: null });
 
   pc.onicecandidate = event => {

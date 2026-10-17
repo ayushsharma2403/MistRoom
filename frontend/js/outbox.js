@@ -26,11 +26,41 @@ export function initIndexedDB() {
   });
 }
 
+const MAX_OUTBOX_ITEMS = 200;
+const OUTBOX_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 export function queueOfflineMessage(msg) {
   if (!state.dbInstance) return;
   try {
     const tx = state.dbInstance.transaction('outbox', 'readwrite');
-    tx.objectStore('outbox').put(msg);
+    const store = tx.objectStore('outbox');
+
+    // Add creation timestamp if missing
+    if (!msg.created_at) msg.created_at = Date.now();
+
+    const getAllReq = store.getAll();
+    getAllReq.onsuccess = () => {
+      const items = getAllReq.result || [];
+      const now = Date.now();
+
+      // Expire items older than 24h
+      for (const it of items) {
+        if (now - (it.created_at || it.ts || now) > OUTBOX_EXPIRY_MS) {
+          store.delete(it.id);
+        }
+      }
+
+      // Cap at 200 items: if at limit, remove oldest
+      if (items.length >= MAX_OUTBOX_ITEMS) {
+        items.sort((a, b) => (a.created_at || a.ts || 0) - (b.created_at || b.ts || 0));
+        const toRemove = items.slice(0, items.length - MAX_OUTBOX_ITEMS + 1);
+        for (const rem of toRemove) {
+          store.delete(rem.id);
+        }
+      }
+
+      store.put(msg);
+    };
   } catch (e) {
     console.warn('Failed to queue offline message:', e);
   }
@@ -47,12 +77,19 @@ export function removeQueuedMessage(id) {
 export async function flushOfflineOutbox() {
   if (!state.dbInstance) return;
   try {
-    const tx = state.dbInstance.transaction('outbox', 'readonly');
+    const tx = state.dbInstance.transaction('outbox', 'readwrite');
     const store = tx.objectStore('outbox');
     const req = store.getAll();
     req.onsuccess = async () => {
       const items = req.result || [];
+      const now = Date.now();
       for (const item of items) {
+        // Drop expired
+        if (now - (item.created_at || item.ts || now) > OUTBOX_EXPIRY_MS) {
+          store.delete(item.id);
+          continue;
+        }
+
         let sent = false;
         let p2pCount = 0;
         const serialized = JSON.stringify(item);
@@ -72,7 +109,7 @@ export async function flushOfflineOutbox() {
         }
 
         if (sent) {
-          removeQueuedMessage(item.id);
+          store.delete(item.id);
           updateMessageStatus(item.id, 'sent');
         }
       }

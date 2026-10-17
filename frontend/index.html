@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060913">
 <title>MistRoom – Anonymous Mesh & Safety Hub</title>
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="style.css?v=be4efb6d">
 </head>
 <body>
@@ -94,12 +95,33 @@
           <span class="btn-liquid-text">Enter Secure Mesh</span>
           <span class="btn-liquid-arrow">→</span>
         </button>
+        <button type="button" id="restore-phrase-btn" class="btn-action-sm" style="margin-top:10px;width:100%;background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1);">
+          🔑 Restore from Recovery Phrase
+        </button>
       </div>
 
       <div class="zero-knowledge-footer">
         <span>🔒 Zero Accounts • Zero Plaintext • Zero Logs</span>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Restore From Phrase Modal -->
+<div id="restore-modal" class="modal-overlay" style="display:none;">
+  <div class="liquid-card" style="max-width:440px;width:100%;padding:24px;">
+    <div class="settings-modal-header" style="margin-bottom:12px;">
+      <h3>🔑 Restore Identity</h3>
+      <button type="button" id="close-restore-btn" class="btn-close-modal">&times;</button>
+    </div>
+    <p class="settings-hint">Enter your 12-word recovery phrase separated by spaces. This will regenerate your exact Ed25519 keypair and peer ID.</p>
+    <div style="margin:16px 0;">
+      <textarea id="restore-phrase-input" placeholder="abandon ability able about above..." rows="4" style="width:100%;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:12px;color:#fff;padding:12px;font-family:var(--font-mono);font-size:13px;resize:none;"></textarea>
+      <div id="restore-error" style="display:none;color:#ef4444;font-size:12px;margin-top:6px;font-weight:500;">Invalid 12-word recovery phrase.</div>
+    </div>
+    <button type="button" id="submit-restore-btn" class="btn-liquid-enter" style="width:100%;justify-content:center;">
+      Validate & Restore Identity
+    </button>
   </div>
 </div>
 
@@ -114,6 +136,7 @@
       <div class="room-badge-container">
         <span class="badge badge-room" id="active-room-badge">#global</span>
       </div>
+      <span id="ghost-chip" class="badge" style="display:none;background:rgba(217,70,239,0.2);color:#f472b6;border:1px solid rgba(217,70,239,0.4);font-size:11px;padding:3px 8px;border-radius:99px;">👻 Ghost on</span>
       <div class="security-badges">
         <span class="badge badge-mesh" id="mesh-counter">Mesh: 0 P2P</span>
       </div>
@@ -124,8 +147,21 @@
         <span class="btn-peers-dot"></span>
         Peers (<span id="peer-count">0</span>)
       </button>
-      <button type="button" id="settings-toggle-btn" class="glass-icon-btn" title="Identity Backup & Privacy Settings">⚙️</button>
-      <button type="button" id="logout-btn" class="glass-btn-logout" title="Leave room">Disconnect</button>
+      <button type="button" id="settings-toggle-btn" class="glass-icon-btn desk-only" title="Identity Backup & Privacy Settings">⚙️</button>
+      <button type="button" id="logout-btn" class="glass-btn-logout desk-only" title="Leave room">Disconnect</button>
+
+      <!-- Mobile Compact ⋯ Menu Button -->
+      <div class="header-menu-wrap" style="position:relative;">
+        <button type="button" id="header-more-btn" class="glass-icon-btn" title="More options" aria-label="Menu">⋯</button>
+        <div id="header-dropdown-menu" class="liquid-card" style="display:none;position:absolute;right:0;top:100%;margin-top:6px;min-width:160px;z-index:999;padding:6px;flex-direction:column;gap:4px;">
+          <button type="button" id="menu-settings-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">⚙️ Settings</button>
+          <button type="button" id="menu-needs-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">📋 Needs Board</button>
+          <button type="button" id="menu-mesh-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">⚡ Mesh Info</button>
+          <div style="height:1px;background:rgba(255,255,255,0.1);margin:4px 0;"></div>
+          <button type="button" id="menu-logout-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#ef4444;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">🚪 Disconnect</button>
+        </div>
+      </div>
+
       <div class="status-indicator">
         <span class="status-dot" id="status-dot"></span>
         <span class="status-text" id="status-text">Mesh Online</span>
@@ -172,26 +208,24 @@
 
         <form id="composer-form" class="composer-liquid-form">
           <input type="file" id="file-input" style="display:none;" />
-          
-          <button type="button" id="attach-file-btn" class="btn-3d-action btn-3d-file" title="Share encrypted file or photo" aria-label="Share encrypted file or photo">
-            <svg class="icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-            </svg>
-          </button>
 
-          <button type="button" id="women-safety-btn" class="btn-3d-action btn-3d-shield" title="Women's Safety SOS (Auto-pins GPS & broadcasts distress)" aria-label="Women's Safety Distress">
-            <svg class="icon-shield" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L20 6V12C20 17.52 16.59 21.74 12 23C7.41 21.74 4 17.52 4 12V6L12 2Z" fill="url(#shield-btn-grad)" />
-              <path d="M12 7V13M12 16H12.01" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
-              <defs>
-                <linearGradient id="shield-btn-grad" x1="4" y1="2" x2="20" y2="23" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#F472B6" />
-                  <stop offset="0.5" stop-color="#D946EF" />
-                  <stop offset="1" stop-color="#9333EA" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </button>
+          <!-- Expandable Plus Menu for Secondary Tools -->
+          <div class="composer-plus-wrap" style="position:relative;">
+            <button type="button" id="composer-plus-btn" class="btn-3d-action" title="More actions (File, Safety, GPS)" aria-label="Attachments and Safety" style="font-size:18px;font-weight:700;">
+              +
+            </button>
+            <div id="composer-plus-dropdown" class="liquid-card" style="display:none;position:absolute;left:0;bottom:100%;margin-bottom:8px;min-width:180px;z-index:999;padding:6px;flex-direction:column;gap:4px;">
+              <button type="button" id="women-safety-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(217,70,239,0.15);border:none;color:#f472b6;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;">
+                🛡️ Women Safety
+              </button>
+              <button type="button" id="gps-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.06);border:none;color:#fff;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;">
+                📍 Attach GPS
+              </button>
+              <button type="button" id="attach-file-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.06);border:none;color:#fff;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;">
+                📎 Share File/Photo
+              </button>
+            </div>
+          </div>
 
           <div class="message-input-glass-wrap">
             <input 
@@ -202,19 +236,6 @@
               maxlength="500" 
             />
           </div>
-
-          <button type="button" id="gps-btn" class="btn-3d-action btn-3d-gps" title="Attach GPS Location" aria-label="Attach GPS Location">
-            <svg class="icon-gps" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C7.58 2 4 5.58 4 10C4 15.25 12 22 12 22C12 22 20 15.25 20 10C20 5.58 16.42 2 12 2Z" fill="url(#gps-pin-grad)" />
-              <circle cx="12" cy="10" r="3.2" fill="#FFFFFF" />
-              <defs>
-                <linearGradient id="gps-pin-grad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#FF6B4A" />
-                  <stop offset="1" stop-color="#E23E28" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </button>
 
           <button type="submit" id="send-btn" class="btn-3d-action btn-3d-send" title="Send message" aria-label="Send message">
             <svg class="icon-send" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -338,10 +359,26 @@
 
       <div class="settings-section">
         <h3>🔑 Cryptographic Identity Recovery</h3>
-        <p class="settings-hint">Save your mnemonic recovery phrase to restore your identity and room passkey on any other device without accounts.</p>
+        <p class="settings-hint">Your mnemonic recovery phrase deterministically restores your Ed25519 identity keypair and peer ID on any device without accounts.</p>
         <div class="recovery-box">
-          <div id="recovery-phrase-display" class="recovery-phrase">Generating...</div>
-          <button type="button" id="copy-recovery-btn" class="btn-action-sm">Copy Seed Phrase</button>
+          <div id="recovery-phrase-display" class="recovery-phrase" style="letter-spacing:1px;font-family:var(--font-mono);font-size:13px;padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;">••••••••••••••••••••••••••••••••••••</div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button type="button" id="show-recovery-btn" class="btn-action-sm">👁️ Reveal Recovery Phrase</button>
+            <button type="button" id="copy-recovery-btn" class="btn-action-sm" style="display:none;">📋 Copy Phrase</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>🌐 WebRTC & Custom ICE</h3>
+        <p class="settings-hint">By default, MistRoom operates host-only on local Wi-Fi/hotspot (zero external STUN requests). You can optionally provide your own STUN/TURN servers.</p>
+        <div style="margin-top:8px;">
+          <input 
+            type="text" 
+            id="custom-ice-input" 
+            placeholder="stun:your-stun-server.org:3478, turn:..." 
+            style="width:100%;padding:10px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;font-size:12px;" 
+          />
         </div>
       </div>
 

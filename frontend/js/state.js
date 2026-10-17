@@ -16,7 +16,9 @@ export const state = {
   currentPeersList: [],
   forwardedMessageIds: new Set(),
   blockedPeerIds: new Set(JSON.parse(localStorage.getItem('mistroom_blocked_peers') || '[]')),
+  blockedPeersMap: new Map(JSON.parse(localStorage.getItem('mistroom_blocked_peers_map') || '[]')), // peerId -> handle
   isStealthMode: localStorage.getItem('mistroom_stealth') === 'true',
+  customIceServers: localStorage.getItem('mistroom_custom_ice') || '',
   activeIncomingFiles: new Map(),
   activeCallPeerConnection: null,
   localMediaStream: null,

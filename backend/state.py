@@ -58,9 +58,10 @@ async def send_json(ws: WebSocket, payload: dict):
 
 
 async def broadcast_peers():
-    # Room list with live peer counts; room names come only from rooms with at least 1 peer
+    # Room list with live peer counts; room names come only from rooms with at least 1 non-ghost peer
     active_room_counts = Counter(
-        cl.get("room", "global") for cl in clients.values() if cl.get("name")
+        cl.get("room", "global") for cl in clients.values()
+        if cl.get("name") and not cl.get("ghost", False)
     )
     available_rooms_with_counts = [
         {"room": r, "count": count} for r, count in active_room_counts.items() if count > 0
@@ -71,9 +72,10 @@ async def broadcast_peers():
     for ws_client, c in list(clients.items()):
         current_room = c.get("room", "global")
 
+        # Exclude ghost clients from people list
         room_clients = [
             cl for cl in clients.values()
-            if cl.get("name") and cl.get("room", "global") == current_room
+            if cl.get("name") and cl.get("room", "global") == current_room and not cl.get("ghost", False)
         ]
 
         name_counts = Counter(cl["name"].lower() for cl in room_clients)
