@@ -14,19 +14,19 @@ import {
   startCallTimer, endCall
 } from './calls.js';
 
+import {
+  decryptEnvelope, verifyMessageSignature, signChallengeNonce,
+  bytesToBase64
+} from './crypto.js';
+
 export function connectWebSocket(onSwitchRoom) {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   state.ws = new WebSocket(`${protocol}//${location.host}/ws`);
 
   state.ws.onopen = () => {
     $('status-dot').className = 'status-dot online';
-    $('status-text').textContent = 'Online';
-    state.ws.send(JSON.stringify({
-      t: 'join',
-      name: state.currentNickname,
-      peer_id: state.myPeerId,
-      room: state.currentRoom
-    }));
+    $('status-text').textContent = 'Authenticating...';
+    // Server will immediately send challenge nonce upon connection.
   };
 
   state.ws.onclose = () => {
@@ -40,6 +40,25 @@ export function connectWebSocket(onSwitchRoom) {
     try {
       data = JSON.parse(event.data);
     } catch (e) {
+      console.debug('Bad JSON frame from server dropped');
+      return;
+    }
+
+    if (data.t === 'challenge') {
+      if (!data.nonce || !state.identity) {
+        console.debug('Missing challenge nonce or client identity');
+        return;
+      }
+      const sigB64 = signChallengeNonce(data.nonce, state.identity.privateKey);
+      const pkB64 = bytesToBase64(state.identity.publicKey);
+      state.ws.send(JSON.stringify({
+        t: 'join',
+        name: state.isStealthMode ? 'Anonymous' : state.currentNickname,
+        room: state.currentRoom,
+        pk: pkB64,
+        sig: sigB64
+      }));
+      $('status-text').textContent = 'Online';
       return;
     }
 
@@ -47,9 +66,21 @@ export function connectWebSocket(onSwitchRoom) {
       state.messagesHistory.length = 0;
       $('messages-list').textContent = '';
       for (const m of data.history) {
-        if (m.ciphertext && m.iv) {
-          m.text = await decryptMessage(m.ciphertext, m.iv);
+        let isVerified = false;
+        if (m.sig && m.pk && m.envelope) {
+          isVerified = verifyMessageSignature(m.envelope, m.sig, m.pk, m.room, m.id, m.ts);
         }
+
+        if (m.envelope) {
+          const decrypted = await decryptEnvelope(m.envelope);
+          if (decrypted !== null) {
+            m.text = decrypted;
+          } else {
+            m.text = null;
+            m.unreadable = true;
+          }
+        }
+        m.verified = isVerified;
         state.messagesHistory.push(m);
         appendMessageToUI(m, false);
       }
@@ -67,9 +98,31 @@ export function connectWebSocket(onSwitchRoom) {
       if (data.msg.target_peer && !isTargetedToMe && data.msg.peer_id !== state.myPeerId) return;
       if (isBroadcast && data.msg.room && data.msg.room !== state.currentRoom && !data.msg.sos) return;
 
-      if (data.msg.ciphertext && data.msg.iv) {
-        data.msg.text = await decryptMessage(data.msg.ciphertext, data.msg.iv);
+      // Verify signature if envelope exists
+      let isVerified = false;
+      if (data.msg.sig && data.msg.pk && data.msg.envelope) {
+        isVerified = verifyMessageSignature(data.msg.envelope, data.msg.sig, data.msg.pk, data.msg.room, data.msg.id, data.msg.ts);
+        if (!isVerified) {
+          console.debug('Dropped message with invalid signature or mismatched peer_id');
+          return;
+        }
       }
+
+      if (data.msg.envelope) {
+        const decrypted = await decryptEnvelope(data.msg.envelope);
+        if (decrypted !== null) {
+          data.msg.text = decrypted;
+        } else {
+          data.msg.text = null;
+          data.unreadable = true;
+        }
+      } else if (data.msg.ciphertext && data.msg.iv) {
+        // Fallback for mock/legacy
+        data.msg.text = null;
+        data.unreadable = true;
+      }
+
+      data.msg.verified = isVerified;
       state.messagesHistory.push(data.msg);
       appendMessageToUI(data.msg);
       updateSOSBanner();

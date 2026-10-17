@@ -4,11 +4,12 @@
 export const state = {
   ws: null,
   currentNickname: '',
-  currentPasskey: 'mistroom-safe',
+  currentPasskey: '',
   currentRoom: 'global',
   activeDirectPeer: null, // { peer_id, name } or null
-  cryptoKey: null,
-  myPeerId: 'peer_' + Math.random().toString(36).substring(2, 9),
+  cryptoKey: null, // 32-byte Uint8Array room key
+  identity: null, // { privKey, pubKey, peerId }
+  myPeerId: '', // derived from Ed25519 pubKey
   messagesHistory: [],
   meshPeers: new Map(), // peerId -> { pc, dc }
   allDiscoveredRooms: ['global'],

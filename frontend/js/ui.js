@@ -1,11 +1,15 @@
 /**
  * UI Rendering and DOM Interactions for MistRoom.
+ * Zero innerHTML with network/user data. Verified signatures and v2 envelopes.
  */
 import { state, $ } from './state.js';
 import { triageText } from './triage.js';
-import { encryptMessage, deriveEncryptionKey } from './crypto.js';
+import {
+  encryptEnvelope, signMessageEnvelope, bytesToBase64
+} from './crypto.js';
 import { queueOfflineMessage } from './outbox.js';
 import { blockPeer, unblockPeer } from './settings.js';
+import { isSafePreviewMime } from './files.js';
 
 export const CATEGORY_LABELS = {
   sos: '🚨 SOS',
@@ -83,6 +87,14 @@ export function appendMessageToUI(msg, autoScroll = true) {
 
   meta.append(sender, time);
 
+  if (msg.verified) {
+    const verifiedDot = document.createElement('span');
+    verifiedDot.className = 'verified-dot';
+    verifiedDot.title = 'Cryptographically Verified Signature';
+    verifiedDot.textContent = '🟢';
+    meta.append(verifiedDot);
+  }
+
   if (isDM) {
     const dmTag = document.createElement('span');
     dmTag.className = 'dm-tag';
@@ -106,12 +118,17 @@ export function appendMessageToUI(msg, autoScroll = true) {
 
   const textNode = document.createElement('div');
   textNode.className = 'msg-text';
-  textNode.textContent = msg.text || '';
-  if (msg.text) bubble.append(meta, textNode);
-  else bubble.append(meta);
+  if (msg.unreadable) {
+    textNode.style.color = '#94A3B8';
+    textNode.style.fontStyle = 'italic';
+    textNode.textContent = '[unreadable message]';
+  } else {
+    textNode.textContent = msg.text || '';
+  }
 
+  if (msg.text || msg.unreadable) bubble.append(meta, textNode);
   if (msg.file) {
-    const isImage = (msg.file.type || '').startsWith('image/');
+    const isImage = isSafePreviewMime(msg.file.type);
     if (isImage && msg.file.url) {
       const img = document.createElement('img');
       img.src = msg.file.url;
@@ -124,7 +141,7 @@ export function appendMessageToUI(msg, autoScroll = true) {
     const fileCard = document.createElement('a');
     fileCard.className = 'file-card';
     fileCard.href = msg.file.url || '#';
-    fileCard.download = msg.file.name;
+    fileCard.setAttribute('download', msg.file.name);
     fileCard.target = '_blank';
 
     const cardIcon = document.createElement('div');
@@ -280,32 +297,30 @@ export function renderAvailableRooms(rooms, switchRoomCb) {
 }
 
 export async function sendMessage(rawText, isSOS = false) {
-  if (!rawText) return;
+  if (!rawText || !state.cryptoKey) return;
   const triage = isSOS ? { cat: 'sos', prio: 3 } : triageText(rawText);
 
-  const effectiveSOS = isSOS || triage.cat === 'sos' || triage.cat === 'women_safety';
   const mid = 'm_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-  const encrypted = await encryptMessage(rawText);
+  const ts = Date.now();
+  const envelope = encryptEnvelope(rawText, state.cryptoKey);
+
+  const pkB64 = state.identity ? bytesToBase64(state.identity.pubKey) : '';
+  const sigB64 = signMessageEnvelope(state.currentRoom, mid, ts, envelope.n, envelope.c);
 
   const payload = {
     t: 'msg',
     id: mid,
-    from: state.currentNickname,
-    peer_id: state.myPeerId,
     room: state.currentRoom,
-    ciphertext: encrypted.ciphertext,
-    iv: encrypted.iv,
+    envelope,
+    sig: sigB64,
+    pk: pkB64,
     cat: triage.cat,
     prio: triage.prio,
-    sos: effectiveSOS,
-    ts: Date.now(),
-    ttl: 3,
-    hops: 0
+    ts
   };
 
   if (state.activeDirectPeer) {
     payload.target_peer = state.activeDirectPeer.peer_id;
-    payload.is_dm = true;
   }
 
   let p2pCount = 0;
@@ -342,9 +357,18 @@ export async function sendMessage(rawText, isSOS = false) {
   }
 
   const localMessage = {
-    ...payload,
+    id: mid,
+    from: state.currentNickname,
+    peer_id: state.myPeerId,
+    room: state.currentRoom,
+    target_peer: payload.target_peer,
+    is_dm: !!payload.target_peer,
     text: rawText,
+    cat: triage.cat,
+    prio: triage.prio,
+    ts,
     status: initialStatus,
+    verified: true,
     route: p2pCount > 0 ? (state.activeDirectPeer ? 'P2P Direct' : `P2P Mesh (${p2pCount})`) : (sentViaRelay ? 'Relay' : 'Offline Outbox')
   };
   state.messagesHistory.push(localMessage);

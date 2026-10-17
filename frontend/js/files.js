@@ -27,12 +27,42 @@ export function dispatchFilePacket(packet) {
   }
 }
 
+export function sanitizeFileName(name) {
+  if (!name || typeof name !== 'string') return 'file.bin';
+  // Strip path separators and control characters
+  let clean = name.replace(/[\/\\:\*\?"<>\|\x00-\x1F\x7F]/g, '_');
+  clean = clean.trim();
+  if (!clean) clean = 'file.bin';
+  if (clean.length > 100) {
+    const extIdx = clean.lastIndexOf('.');
+    if (extIdx > 0 && extIdx > clean.length - 15) {
+      const ext = clean.slice(extIdx);
+      clean = clean.slice(0, 100 - ext.length) + ext;
+    } else {
+      clean = clean.slice(0, 100);
+    }
+  }
+  return clean;
+}
+
+export const ALLOWED_IMAGE_MIMES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp'
+]);
+
+export function isSafePreviewMime(type) {
+  return ALLOWED_IMAGE_MIMES.has((type || '').toLowerCase().trim());
+}
+
 export async function sendEncryptedFile(file) {
   if (!file) return;
   if (file.size > 25 * 1024 * 1024) {
     return alert('File size exceeds 25 MB limit for peer mesh.');
   }
 
+  const safeName = sanitizeFileName(file.name);
   const fileId = 'f_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
   const targetPeerId = state.activeDirectPeer ? state.activeDirectPeer.peer_id : null;
@@ -43,18 +73,24 @@ export async function sendEncryptedFile(file) {
   const progressBar = $('file-progress-bar');
   if (progressBox) {
     progressBox.style.display = 'block';
-    progressName.textContent = `Encrypting & Sending: ${file.name}`;
+    progressName.textContent = `Encrypting & Sending: ${safeName}`;
     progressPct.textContent = '0%';
     progressBar.style.width = '0%';
   }
 
+  // Encrypt file metadata inside v2 envelope
+  const rawMeta = {
+    name: safeName,
+    size: file.size,
+    type: file.type || 'application/octet-stream',
+    totalChunks
+  };
+  const encMeta = await encryptMessage(JSON.stringify(rawMeta));
+
   const metaPayload = {
     t: 'file_meta',
     fileId,
-    name: file.name,
-    size: file.size,
-    type: file.type || 'application/octet-stream',
-    totalChunks,
+    meta_env: encMeta, // Encrypted v2 envelope
     from: state.currentNickname,
     peer_id: state.myPeerId,
     target_peer: targetPeerId,
@@ -78,8 +114,7 @@ export async function sendEncryptedFile(file) {
       fileId,
       index: i,
       totalChunks,
-      ciphertext: encryptedChunk.ciphertext,
-      iv: encryptedChunk.iv,
+      envelope: encryptedChunk,
       target_peer: targetPeerId,
       room: state.currentRoom
     };
@@ -112,7 +147,7 @@ export async function sendEncryptedFile(file) {
     is_dm: !!targetPeerId,
     ts: Date.now(),
     file: {
-      name: file.name,
+      name: safeName,
       size: file.size,
       type: file.type,
       url: objectUrl
@@ -126,20 +161,47 @@ export async function sendEncryptedFile(file) {
 
 export async function handleIncomingFilePacket(packet) {
   if (packet.t === 'file_meta') {
+    // Decrypt metadata from v2 envelope
+    let meta = null;
+    if (packet.meta_env) {
+      try {
+        const decryptedJson = await decryptMessage(packet.meta_env);
+        if (decryptedJson) {
+          meta = JSON.parse(decryptedJson);
+        }
+      } catch (e) {
+        console.debug('Failed to decrypt file metadata:', e);
+      }
+    } else if (packet.name && packet.totalChunks) {
+      // Legacy fallback
+      meta = {
+        name: packet.name,
+        size: packet.size,
+        type: packet.type,
+        totalChunks: packet.totalChunks
+      };
+    }
+
+    if (!meta) {
+      console.debug('Drop file packet with unreadable metadata');
+      return;
+    }
+
+    const safeName = sanitizeFileName(meta.name);
     state.activeIncomingFiles.set(packet.fileId, {
-      name: packet.name,
-      size: packet.size,
-      type: packet.type,
-      totalChunks: packet.totalChunks,
+      name: safeName,
+      size: meta.size,
+      type: meta.type,
+      totalChunks: meta.totalChunks,
       receivedChunks: 0,
-      chunks: new Array(packet.totalChunks),
+      chunks: new Array(meta.totalChunks),
       from: packet.from,
       peer_id: packet.peer_id,
       room: packet.room,
       target_peer: packet.target_peer,
       ts: packet.ts
     });
-    appendSystemMessage(`📥 Receiving file "${packet.name}" from ${packet.from}...`);
+    appendSystemMessage(`📥 Receiving file "${safeName}" from ${packet.from}...`);
     return;
   }
 
@@ -148,7 +210,15 @@ export async function handleIncomingFilePacket(packet) {
     if (!entry) return;
 
     if (!entry.chunks[packet.index]) {
-      const decryptedB64 = await decryptMessage(packet.ciphertext, packet.iv);
+      const envelope = packet.envelope || (packet.ciphertext ? { v: 2, n: packet.iv, c: packet.ciphertext } : null);
+      if (!envelope) return;
+
+      const decryptedB64 = await decryptMessage(envelope);
+      if (!decryptedB64) {
+        console.debug('Failed to decrypt chunk index', packet.index);
+        return;
+      }
+
       const binaryString = atob(decryptedB64);
       const bytes = Uint8Array.from(binaryString, c => c.charCodeAt(0));
       entry.chunks[packet.index] = bytes.buffer;
@@ -178,7 +248,7 @@ export async function handleIncomingFilePacket(packet) {
         state.activeIncomingFiles.delete(packet.fileId);
         state.messagesHistory.push(fileMsg);
         appendMessageToUI(fileMsg);
-        appendSystemMessage(`✅ Successfully received and verified file "${entry.name}".`);
+        appendSystemMessage(`✅ Successfully received file "${entry.name}".`);
 
         sendDeliveryAck(packet.fileId, entry.peer_id);
       }

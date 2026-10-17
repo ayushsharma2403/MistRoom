@@ -2,7 +2,7 @@
  * MistRoom Application Root: wires ES modules, sets up event listeners.
  */
 import { state, $ } from './js/state.js';
-import { deriveEncryptionKey } from './js/crypto.js';
+import { deriveEncryptionKey, getOrCreateIdentity } from './js/crypto.js';
 import { initIndexedDB, flushOfflineOutbox } from './js/outbox.js';
 import {
   sendMessage, appendSystemMessage, closeDirectChat,
@@ -32,9 +32,10 @@ async function handleJoin() {
   const nameInput = $('nickname-input');
   const passInput = $('passkey-input');
   const roomInput = $('room-input');
+  const passError = $('passkey-error');
 
   const nickname = (nameInput.value || '').trim();
-  const passkey = (passInput.value || '').trim() || 'default-mesh-pass';
+  const passkey = (passInput.value || '').trim();
   const room = (roomInput.value || '').trim().toLowerCase() || 'global';
 
   if (!nickname) {
@@ -42,12 +43,30 @@ async function handleJoin() {
     return;
   }
 
+  // Passkey is required, minimum 8 characters
+  if (!passkey || passkey.length < 8) {
+    if (passError) {
+      passError.style.display = 'block';
+    }
+    passInput.focus();
+    return;
+  } else {
+    if (passError) {
+      passError.style.display = 'none';
+    }
+  }
+
   state.currentNickname = nickname;
   state.currentPasskey = passkey;
   state.currentRoom = room;
 
+  // Initialize or fetch persistent Ed25519 identity from IndexedDB
+  const identity = await getOrCreateIdentity();
+  state.identity = identity;
+  state.myPeerId = identity.peerId;
+
   $('active-room-badge').textContent = `#${state.currentRoom}`;
-  state.cryptoKey = await deriveEncryptionKey(state.currentPasskey);
+  state.cryptoKey = await deriveEncryptionKey(state.currentPasskey, state.currentRoom);
 
   $('join-modal').style.display = 'none';
   connectWebSocket(switchRoom);
