@@ -5,7 +5,7 @@ import { state } from './state.js';
 import { updateMessageStatus } from './ui.js';
 
 export const DB_NAME = 'mistroom_mesh_db';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export function initIndexedDB() {
   return new Promise(resolve => {
@@ -15,6 +15,9 @@ export function initIndexedDB() {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('outbox')) {
         db.createObjectStore('outbox', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('identity')) {
+        db.createObjectStore('identity', { keyPath: 'key' });
       }
     };
     req.onsuccess = e => {

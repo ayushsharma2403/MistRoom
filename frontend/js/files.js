@@ -132,9 +132,8 @@ export async function sendEncryptedFile(file) {
       progressBar.style.width = `${pct}%`;
     }
 
-    if (i % 8 === 0) {
-      await new Promise(r => setTimeout(r, 15));
-    }
+    // Backpressure: yield each chunk to allow event loop and WebRTC buffers to drain
+    await new Promise(r => setTimeout(r, 8));
   }
 
   setTimeout(() => {

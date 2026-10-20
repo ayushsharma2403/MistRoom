@@ -134,6 +134,16 @@ body {
   overflow-y: auto;
 }
 
+[style*="display:none"],
+[style*="display: none"],
+.modal-overlay[style*="display:none"],
+.modal-overlay[style*="display: none"],
+.call-modal[style*="display:none"],
+.call-modal[style*="display: none"] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
 [data-theme="light"] .modal-overlay {
   background: rgba(241, 245, 249, 0.82);
 }

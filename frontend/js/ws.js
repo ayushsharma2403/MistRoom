@@ -10,11 +10,11 @@ import {
 import { handleIncomingFilePacket } from './files.js';
 import { sendDeliveryAck, initWebRTCPeer } from './mesh.js';
 import {
-  handleIncomingCallInvite, activeCallPeerConnection,
+  handleIncomingCallInvite,
   startCallTimer, endCall
 } from './calls.js';
 import {
-  decryptEnvelope, verifyMessageSignature, signChallengeNonce,
+  decryptEnvelope, verifyMessageSignature, signChallengeNonce, signChallenge,
   bytesToBase64, deriveEncryptionKey
 } from './crypto.js';
 

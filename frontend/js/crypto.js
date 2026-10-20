@@ -6,7 +6,7 @@ import { xchacha20poly1305, pbkdf2, sha256, ed25519 } from '../vendor/noble-cryp
 import { state } from './state.js';
 
 const DB_NAME = 'mistroom_mesh_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const ID_STORE = 'identity';
 
 export function bytesToBase64(bytes) {
@@ -306,3 +306,22 @@ export function decryptEnvelope(envelope, keyBytes = state.cryptoKey) {
     return null;
   }
 }
+
+// Compatibility & convenience aliases
+export const deriveEncryptionKey = deriveRoomKey;
+export const encryptMessage = encryptEnvelope;
+export const decryptMessage = (envOrCipher, ivOrKey, optKey) => {
+  if (typeof envOrCipher === 'object' && envOrCipher !== null) {
+    return decryptEnvelope(envOrCipher, ivOrKey || state.cryptoKey);
+  }
+  if (typeof envOrCipher === 'string' && typeof ivOrKey === 'string') {
+    return decryptEnvelope({ v: 2, n: ivOrKey, c: envOrCipher }, optKey || state.cryptoKey);
+  }
+  return null;
+};
+export const signChallengeNonce = signChallenge;
+export function verifyMessageSignature(envelope, sigB64, pkB64, room, id, ts, expectedPeerId) {
+  if (!envelope) return false;
+  return verifyMessageEnvelope(room, id, ts, envelope.n, envelope.c, sigB64, pkB64, expectedPeerId);
+}
+

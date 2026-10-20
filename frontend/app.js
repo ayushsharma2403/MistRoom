@@ -290,6 +290,8 @@ document.addEventListener('DOMContentLoaded', () => {
         state.myPeerId = id.peerId;
       });
     }
+    const jm = $('join-modal');
+    if (jm && !state.cryptoKey) jm.style.display = 'none';
     if (serverlessModal) serverlessModal.style.display = 'flex';
     $('sl-initiator-view').style.display = 'none';
     $('sl-responder-view').style.display = 'none';
@@ -301,6 +303,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (closeServerlessBtn) closeServerlessBtn.addEventListener('click', () => {
     resetActiveBootstrap();
     if (serverlessModal) serverlessModal.style.display = 'none';
+    const jm = $('join-modal');
+    if (jm && !state.cryptoKey) jm.style.display = 'flex';
   });
 
   // Step 1: Start (Initiator)

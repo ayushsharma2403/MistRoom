@@ -562,7 +562,7 @@ export function appendMessageToUI(msg, autoScroll = true) {
     const statusSpan = document.createElement('span');
     statusSpan.id = `status_${msg.id}`;
     statusSpan.className = `msg-status-ack ${msg.status || 'sent'}`;
-    statusSpan.textContent = getStatusIcon(msg.status || 'sent');
+    statusSpan.textContent = getStatusText(msg);
     footerMeta.append(statusSpan);
     bubble.append(footerMeta);
   }

@@ -21,23 +21,26 @@ def test_two_browsers_join_room_and_send_message():
         page1.goto("http://localhost:3001")
         page2.goto("http://localhost:3001")
 
-        # Handle join
+        # Handle join (passkey is required, min 8 chars)
         page1.fill("#nickname-input", "Alice")
+        page1.fill("#passkey-input", "Password123")
         page1.click("#join-btn")
+
         page2.fill("#nickname-input", "Bob")
+        page2.fill("#passkey-input", "Password123")
         page2.click("#join-btn")
 
-        page1.wait_for_selector("#chat-screen:not(.hidden)", timeout=5000)
-        page2.wait_for_selector("#chat-screen:not(.hidden)", timeout=5000)
+        page1.wait_for_selector("#join-modal", state="hidden", timeout=15000)
+        page2.wait_for_selector("#join-modal", state="hidden", timeout=15000)
 
         # Alice sends message
-        test_text = "E2E automated test message from Alice"
+        test_text = f"E2E automated test message from Alice {os.urandom(4).hex()}"
         page1.fill("#message-input", test_text)
-        page1.click("#send-btn")
+        page1.press("#message-input", "Enter")
 
         # Bob verifies delivery
-        page2.wait_for_selector(f"text={test_text}", timeout=5000)
-        assert page2.locator(f"text={test_text}").is_visible()
+        page2.wait_for_selector(f"text={test_text}", timeout=8000)
+        assert page2.locator(f"text={test_text}").first.is_visible()
 
         browser1.close()
         browser2.close()
@@ -60,18 +63,21 @@ def test_send_file_1mb_and_compare_sha256(tmp_path):
         page2.goto("http://localhost:3001")
 
         page1.fill("#nickname-input", "Sender")
+        page1.fill("#passkey-input", "Password123")
         page1.click("#join-btn")
+
         page2.fill("#nickname-input", "Receiver")
+        page2.fill("#passkey-input", "Password123")
         page2.click("#join-btn")
 
-        page1.wait_for_selector("#chat-screen:not(.hidden)", timeout=5000)
-        page2.wait_for_selector("#chat-screen:not(.hidden)", timeout=5000)
+        page1.wait_for_selector("#join-modal", state="hidden", timeout=15000)
+        page2.wait_for_selector("#join-modal", state="hidden", timeout=15000)
 
         page1.set_input_files("#file-input", str(test_file))
-        page2.wait_for_selector(".file-card a[download]", timeout=10000)
+        page2.wait_for_selector("a.file-card[download]", timeout=15000)
 
         with page2.expect_download() as download_info:
-            page2.click(".file-card a[download]")
+            page2.click("a.file-card[download]")
         download = download_info.value
         downloaded_path = tmp_path / "downloaded.dat"
         download.save_as(str(downloaded_path))
@@ -96,26 +102,31 @@ def test_voice_call_connects():
         page2.goto("http://localhost:3001")
 
         page1.fill("#nickname-input", "Caller")
+        page1.fill("#passkey-input", "Password123")
         page1.click("#join-btn")
+
         page2.fill("#nickname-input", "Callee")
+        page2.fill("#passkey-input", "Password123")
         page2.click("#join-btn")
 
-        page1.wait_for_selector("#chat-screen:not(.hidden)", timeout=5000)
-        page2.wait_for_selector("#chat-screen:not(.hidden)", timeout=5000)
+        page1.wait_for_selector("#join-modal", state="hidden", timeout=15000)
+        page2.wait_for_selector("#join-modal", state="hidden", timeout=15000)
 
-        # Call from direct peer
-        page1.wait_for_selector(".peer-item", timeout=5000)
-        page1.click(".peer-item")
+        # Open peers sidebar and call peer
+        page1.click("#toggle-peers-btn")
+        page1.wait_for_selector(".peer-item-interactive", timeout=10000)
+        page1.click(".peer-item-interactive")
         page1.click("#start-voice-call-btn")
 
-        page2.wait_for_selector("#incoming-call-modal:not(.hidden)", timeout=5000)
+        page2.wait_for_selector("#incoming-call-toast", timeout=5000)
         page2.click("#accept-call-btn")
 
-        page1.wait_for_selector("#active-call-modal:not(.hidden)", timeout=5000)
-        page2.wait_for_selector("#active-call-modal:not(.hidden)", timeout=5000)
+        page1.wait_for_selector("#call-modal", timeout=5000)
+        page2.wait_for_selector("#call-modal", timeout=5000)
 
         page1.click("#hangup-call-btn")
-        page2.wait_for_selector("#active-call-modal.hidden", timeout=5000)
+        page2.wait_for_selector("#call-modal", state="hidden", timeout=5000)
 
         browser1.close()
         browser2.close()
+

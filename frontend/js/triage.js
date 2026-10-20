@@ -12,7 +12,7 @@ let LOCATION_REGEXES = [];
 let NEGATION_REGEXES = [];
 let BENIGN_REGEXES = [];
 
-const BLOOD_REGEX = /(?<![\p{L}\p{N}_])(A|B|AB|O)\s*(\+|\-|positive|negative)\s*(blood)?(?![\p{L}\p{N}_])/iu;
+const BLOOD_REGEX = /(?<![\p{L}\p{N}_])(A|B|AB|O)\s*(\+|-|positive|negative)\s*(blood)?(?![\p{L}\p{N}_])/iu;
 const VICTIM_REGEX = /(\d+)\s*(people|persons|victims|injured|trapped|log|bachhe|women|mahilayein|bache)/iu;
 
 function escapeRegex(str) {
