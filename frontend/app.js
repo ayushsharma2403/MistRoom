@@ -601,10 +601,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.beaconConsent) return state.beaconConsent;
     return new Promise(resolve => {
       const modal = $('beacon-consent-modal');
-      const publicBtn = $('beacon-consent-public-btn');
-      const roomBtn = $('beacon-consent-room-btn');
+      const publicBtn = $('btn-consent-beacon');
+      const roomBtn = $('btn-consent-room-only');
       if (!modal || !publicBtn || !roomBtn) {
-        return resolve('room_only');
+        console.error('Consent modal elements missing from DOM');
+        throw new Error('Consent modal elements missing from DOM');
       }
 
       modal.style.display = 'flex';
