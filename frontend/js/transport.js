@@ -3,6 +3,30 @@
  * Supports multiple underlying transports (WebSocket, WebRTC P2P mesh, BLE).
  */
 import { state } from './state.js';
+import { decryptEnvelope, verifyMessageSignature } from './crypto.js';
+import { appendMessageToUI, updateSOSBanner } from './ui.js';
+import { createInbound } from './inbound.js';
+
+const handleInboundMessage = createInbound({
+  state,
+  verifySignature: async (msg) => {
+    if (msg.sig && msg.pk && msg.envelope) {
+      return verifyMessageSignature(msg.envelope, msg.sig, msg.pk, msg.room, msg.id, msg.ts);
+    }
+    return true;
+  },
+  decryptEnvelope: async (msg) => {
+    if (msg.envelope) {
+      return decryptEnvelope(msg.envelope);
+    }
+    return null;
+  },
+  render: (msg) => {
+    appendMessageToUI(msg);
+    updateSOSBanner();
+  },
+  now: () => Date.now(),
+});
 
 /**
  * Base Transport Interface
@@ -230,6 +254,14 @@ export class Router {
         hops: (packet.hops || 0) + 1
       };
       this.relayMultiHop(relayedPacket, sourcePeerId);
+    }
+
+    // Route BLE/Serverless incoming chat packets through handleInboundMessage
+    const transportType = (sourceTransportId || '').toLowerCase();
+    if (transportType === 'ble' || transportType === 'serverless') {
+      if (packet.envelope || (packet.text !== undefined && packet.id)) {
+        await handleInboundMessage(packet, transportType === 'ble' ? 'BLE' : 'Serverless');
+      }
     }
 
     // Deliver to local app if addressed to me or broadcast

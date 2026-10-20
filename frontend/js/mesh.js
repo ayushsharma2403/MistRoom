@@ -2,12 +2,34 @@
  * WebRTC P2P DataChannel Mesh Networking.
  */
 import { state, $ } from './state.js';
-import { decryptMessage, signAck, bytesToBase64 } from './crypto.js';
+import { decryptEnvelope, verifyMessageSignature, signAck, bytesToBase64 } from './crypto.js';
 import { flushOfflineOutbox } from './outbox.js';
 import {
   updateMessageStatus, appendMessageToUI, updateSOSBanner
 } from './ui.js';
 import { handleIncomingFilePacket } from './files.js';
+import { createInbound } from './inbound.js';
+
+const handleInboundMessage = createInbound({
+  state,
+  verifySignature: async (msg) => {
+    if (msg.sig && msg.pk && msg.envelope) {
+      return verifyMessageSignature(msg.envelope, msg.sig, msg.pk, msg.room, msg.id, msg.ts);
+    }
+    return true;
+  },
+  decryptEnvelope: async (msg) => {
+    if (msg.envelope) {
+      return decryptEnvelope(msg.envelope);
+    }
+    return null;
+  },
+  render: (msg) => {
+    appendMessageToUI(msg);
+    updateSOSBanner();
+  },
+  now: () => Date.now(),
+});
 
 export function getRtcConfig() {
   if (state.customIceServers) {
@@ -117,42 +139,24 @@ export function attachDataChannelEvents(dc, targetPeerId) {
         return;
       }
 
-      if (msg.peer_id && state.blockedPeerIds.has(msg.peer_id)) {
-        return;
-      }
-
-      if (!msg.id) return;
-      if (state.messagesHistory.some(m => m.id === msg.id)) return;
-
-      const isTargetedToMe = msg.target_peer === state.myPeerId;
-      const isBroadcast = !msg.target_peer;
-
-      if (!state.forwardedMessageIds.has(msg.id)) {
-        state.forwardedMessageIds.add(msg.id);
-        const ttl = typeof msg.ttl === 'number' ? msg.ttl : 3;
-        if (ttl > 1) {
-          const relayedPacket = {
-            ...msg,
-            ttl: ttl - 1,
-            hops: (msg.hops || 0) + 1
-          };
-          relayMultiHop(relayedPacket, targetPeerId);
+      const ok = await handleInboundMessage(msg, 'P2P Direct');
+      if (ok) {
+        if (!state.forwardedMessageIds.has(msg.id)) {
+          state.forwardedMessageIds.add(msg.id);
+          const ttl = typeof msg.ttl === 'number' ? msg.ttl : 3;
+          if (ttl > 1) {
+            const relayedPacket = {
+              ...msg,
+              ttl: ttl - 1,
+              hops: (msg.hops || 0) + 1
+            };
+            relayMultiHop(relayedPacket, targetPeerId);
+          }
+        }
+        if (msg.peer_id && msg.peer_id !== state.myPeerId) {
+          sendDeliveryAck(msg.id, msg.peer_id);
         }
       }
-
-      if (msg.target_peer && !isTargetedToMe) return;
-      if (isBroadcast && msg.room && msg.room !== state.currentRoom && !msg.sos) return;
-
-      if (msg.ciphertext && msg.iv) {
-        msg.text = await decryptMessage(msg.ciphertext, msg.iv);
-      }
-
-      msg.route = msg.hops > 0 ? `Mesh (${msg.hops + 1}-Hop)` : 'P2P Direct';
-      state.messagesHistory.push(msg);
-      appendMessageToUI(msg);
-      updateSOSBanner();
-
-      sendDeliveryAck(msg.id, msg.peer_id);
     } catch (err) {
       console.error('DataChannel message parse error:', err);
     }

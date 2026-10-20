@@ -219,7 +219,7 @@ export async function handleIncomingFilePacket(packet) {
     if (!entry) return;
 
     if (!entry.chunks[packet.index]) {
-      const envelope = packet.envelope || (packet.ciphertext ? { v: 2, n: packet.iv, c: packet.ciphertext } : null);
+      const envelope = packet.envelope;
       if (!envelope) return;
 
       const decryptedB64 = await decryptMessage(envelope);
