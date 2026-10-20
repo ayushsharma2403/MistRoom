@@ -5,7 +5,7 @@
 import { state, $ } from './state.js';
 import { triageText } from './triage.js';
 import {
-  encryptEnvelope, signMessageEnvelope, bytesToBase64, signResolveNeed
+  encryptEnvelope, signMessageEnvelope, bytesToBase64, signResolveNeed, signGenericSig
 } from './crypto.js';
 import { queueOfflineMessage } from './outbox.js';
 import { blockPeer, unblockPeer } from './settings.js';
@@ -684,17 +684,28 @@ export function renderAvailableRooms(rooms, switchRoomCb) {
 export async function sendPublicBeacon(cat, prio, shortText, coords = null) {
   const bid = 'b_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
   const ts = Date.now();
+  const short_text = (shortText || '').substring(0, 140);
+  const lat = coords ? coords.lat : null;
+  const lon = coords ? coords.lon : null;
+  const pk = state.identity ? bytesToBase64(state.identity.pubKey) : '';
+  const lat_str = lat !== null ? String(lat) : '';
+  const lon_str = lon !== null ? String(lon) : '';
+  const sigPayload = `beacon|${bid}|${cat}|${prio}|${short_text}|${lat_str}|${lon_str}|${ts}`;
+  const sig = signGenericSig(sigPayload);
+
   const beaconPayload = {
     t: 'beacon',
     id: bid,
     cat,
     prio,
-    short_text: (shortText || '').substring(0, 140),
-    lat: coords ? coords.lat : null,
-    lon: coords ? coords.lon : null,
+    short_text,
+    lat,
+    lon,
     accuracy: coords ? coords.accuracy : null,
     handle: state.isStealthMode ? 'Ghost' : state.currentNickname,
-    ts
+    ts,
+    pk,
+    sig
   };
 
   // Broadcast to P2P mesh

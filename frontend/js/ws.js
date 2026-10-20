@@ -15,7 +15,7 @@ import {
 } from './calls.js';
 import {
   decryptEnvelope, verifyMessageSignature, signChallengeNonce, signChallenge,
-  bytesToBase64, deriveEncryptionKey
+  bytesToBase64, deriveEncryptionKey, verifyGenericSig
 } from './crypto.js';
 import { createInbound } from './inbound.js';
 
@@ -159,6 +159,13 @@ export function connectWebSocket(onSwitchRoom) {
 
     if (data.t === 'beacon') {
       if (!data.id || state.activeBeacons.has(data.id)) return;
+      if (!data.pk || !data.sig) return;
+      const lat_str = data.lat !== null && data.lat !== undefined ? String(data.lat) : '';
+      const lon_str = data.lon !== null && data.lon !== undefined ? String(data.lon) : '';
+      const payloadStr = `beacon|${data.id}|${data.cat}|${data.prio}|${data.short_text}|${lat_str}|${lon_str}|${data.ts}`;
+      const isValid = verifyGenericSig(payloadStr, data.sig, data.pk);
+      if (!isValid) return;
+
       state.activeBeacons.set(data.id, data);
       updateBeaconBanner();
       renderBeaconListModal();
