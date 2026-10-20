@@ -17,6 +17,31 @@ import {
   decryptEnvelope, verifyMessageSignature, signChallengeNonce, signChallenge,
   bytesToBase64, deriveEncryptionKey
 } from './crypto.js';
+import { createInbound } from './inbound.js';
+
+const handleInboundMessage = createInbound({
+  state,
+  verifySignature: async (msg) => {
+    if (msg.sig && msg.pk && msg.envelope) {
+      return verifyMessageSignature(msg.envelope, msg.sig, msg.pk, msg.room, msg.id, msg.ts);
+    }
+    return true;
+  },
+  decryptEnvelope: async (msg) => {
+    if (msg.envelope) {
+      return decryptEnvelope(msg.envelope);
+    }
+    return null;
+  },
+  render: (msg) => {
+    appendMessageToUI(msg);
+    updateSOSBanner();
+    if (msg.peer_id && msg.peer_id !== state.myPeerId) {
+      sendDeliveryAck(msg.id, msg.peer_id);
+    }
+  },
+  now: () => Date.now(),
+});
 
 export function connectWebSocket(onSwitchRoom) {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -147,45 +172,8 @@ export function connectWebSocket(onSwitchRoom) {
     }
 
     if (data.t === 'msg') {
-      if (data.msg.peer_id && state.blockedPeerIds.has(data.msg.peer_id)) return;
-      if (state.messagesHistory.some(m => m.id === data.msg.id)) return;
-
-      const isTargetedToMe = data.msg.target_peer === state.myPeerId;
-      const isBroadcast = !data.msg.target_peer;
-
-      if (data.msg.target_peer && !isTargetedToMe && data.msg.peer_id !== state.myPeerId) return;
-      if (isBroadcast && data.msg.room && data.msg.room !== state.currentRoom && !data.msg.sos) return;
-
-      // Verify signature if envelope exists
-      let isVerified = false;
-      if (data.msg.sig && data.msg.pk && data.msg.envelope) {
-        isVerified = verifyMessageSignature(data.msg.envelope, data.msg.sig, data.msg.pk, data.msg.room, data.msg.id, data.msg.ts);
-        if (!isVerified) {
-          console.debug('Dropped message with invalid signature or mismatched peer_id');
-          return;
-        }
-      }
-
-      if (data.msg.envelope) {
-        const decrypted = await decryptEnvelope(data.msg.envelope);
-        if (decrypted !== null) {
-          data.msg.text = decrypted;
-        } else {
-          data.msg.text = null;
-          data.unreadable = true;
-        }
-      } else if (data.msg.ciphertext && data.msg.iv) {
-        data.msg.text = null;
-        data.unreadable = true;
-      }
-
-      data.msg.verified = isVerified;
-      state.messagesHistory.push(data.msg);
-      appendMessageToUI(data.msg);
-      updateSOSBanner();
-
-      if (data.msg.peer_id && data.msg.peer_id !== state.myPeerId) {
-        sendDeliveryAck(data.msg.id, data.msg.peer_id);
+      if (data.msg) {
+        handleInboundMessage(data.msg, 'Relay');
       }
     }
 
