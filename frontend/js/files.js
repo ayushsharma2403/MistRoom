@@ -145,7 +145,8 @@ export async function sendEncryptedFile(file) {
   const progressPct = $('file-progress-percent');
   const progressBar = $('file-progress-bar');
   if (progressBox) {
-    progressBox.style.display = 'block';
+    progressBox.classList.add('is-shown');
+    progressBox.classList.remove('is-hidden');
     progressName.textContent = `Encrypting & Sending: ${safeName}`;
     progressPct.textContent = '0%';
     progressBar.style.width = '0%';
@@ -195,7 +196,10 @@ export async function sendEncryptedFile(file) {
     try {
       await dispatchFileChunkWithFlowControl(chunkPayload, targetPeerId);
     } catch (err) {
-      if (progressBox) progressBox.style.display = 'none';
+      if (progressBox) {
+        progressBox.classList.add('is-hidden');
+        progressBox.classList.remove('is-shown');
+      }
       appendSystemMessage(`❌ File transfer failed: ${err.message || 'Transfer rate limited.'}`);
       return;
     }
@@ -208,7 +212,10 @@ export async function sendEncryptedFile(file) {
   }
 
   setTimeout(() => {
-    if (progressBox) progressBox.style.display = 'none';
+    if (progressBox) {
+      progressBox.classList.add('is-hidden');
+      progressBox.classList.remove('is-shown');
+    }
   }, 1000);
 
   const blob = new Blob([buffer], { type: file.type });

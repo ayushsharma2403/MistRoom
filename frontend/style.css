@@ -2,8 +2,13 @@
    Mission Focus: Women's Safety, Disaster Relief, Anonymous Civil Mesh
 */
 
-.u-hidden {
+.u-hidden,
+.is-hidden {
   display: none !important;
+}
+
+.is-shown {
+  display: flex !important;
 }
 
 :root {
@@ -552,6 +557,32 @@ body {
 /* -------------------------------------------------------------
    3. SOS & WOMEN SAFETY GLOW BANNERS
    ------------------------------------------------------------- */
+.modal-content,
+.settings-card,
+.liquid-card.u-0142c1d1,
+.liquid-card.u-ea265e0c,
+.liquid-card.u-4e977a41,
+.liquid-card.u-2022fe5b,
+.liquid-card.u-e8a9b11c {
+  max-height: 90vh;
+  overflow: auto;
+  position: relative;
+}
+
+.settings-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--glass-card, rgba(18, 25, 46, 0.95));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0 12px 0;
+  margin-bottom: 16px;
+}
+
 .glass-banner {
   padding: 10px 18px;
   font-size: 13px;
@@ -562,6 +593,45 @@ body {
   color: #FFFFFF;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   animation: bannerPulse 2s infinite alternate;
+}
+
+/* SOS banner: Red background with >=4.5:1 text contrast */
+.sos-banner {
+  background: #B91C1C !important; /* dark saturated red: contrast with white #ffffff is > 5.5:1 */
+  color: #FFFFFF !important;
+}
+
+/* Women Safety banner: Purple background with >=4.5:1 text contrast */
+.women-safety-banner,
+.glass-banner[style*="7928CA"] {
+  background: #6B21A8 !important; /* rich purple: contrast with white #ffffff is > 7:1 */
+  color: #FFFFFF !important;
+}
+
+/* Beacon banner: Amber background with >=4.5:1 text contrast */
+.beacon-banner {
+  background: #78350F !important; /* amber-900: contrast with white #ffffff is > 7.5:1 */
+  color: #FFFFFF !important;
+  border-left: 4px solid #F59E0B;
+}
+
+/* Peers list small block icon button */
+.peer-item .btn-unblock {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #F87171;
+  cursor: pointer;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.peer-item .btn-unblock:hover {
+  background: rgba(239, 68, 68, 0.3);
 }
 
 @keyframes bannerPulse {
@@ -1219,12 +1289,6 @@ body {
   padding: 24px;
 }
 
-.settings-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
 
 .btn-close-modal {
   background: none;
@@ -1383,6 +1447,7 @@ body {
     background: var(--bg-card);
     z-index: 500;
     box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.6);
+    display: none;
   }
 
   /* Composer mobile responsiveness: input >= 60% width, min 44px touch targets */

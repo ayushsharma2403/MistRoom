@@ -41,7 +41,8 @@ export async function startCall(peer) {
 
   $('call-peer-title').textContent = `📞 Voice Call with ${peer.name}`;
   $('call-status-label').textContent = 'Calling...';
-  $('call-modal').style.display = 'flex';
+  $('call-modal').classList.add('is-shown');
+  $('call-modal').classList.remove('is-hidden');
 
   state.activeCallPeerConnection = new RTCPeerConnection(getRtcConfig());
   state.localMediaStream.getTracks().forEach(track => {
@@ -103,11 +104,13 @@ export async function handleIncomingCallInvite(senderPeerId, senderName, data) {
 
   $('incoming-caller-name').textContent = senderName;
   $('incoming-call-type').textContent = 'Incoming voice call...';
-  $('incoming-call-toast').style.display = 'flex';
+  $('incoming-call-toast').classList.add('is-shown');
+  $('incoming-call-toast').classList.remove('is-hidden');
 }
 
 export async function acceptIncomingCall() {
-  $('incoming-call-toast').style.display = 'none';
+  $('incoming-call-toast').classList.add('is-hidden');
+  $('incoming-call-toast').classList.remove('is-shown');
   if (!state.pendingIncomingCall) return;
 
   const { peer_id, name, data } = state.pendingIncomingCall;
@@ -123,7 +126,8 @@ export async function acceptIncomingCall() {
 
   $('call-peer-title').textContent = `📞 Voice Call with ${name}`;
   $('call-status-label').textContent = 'Connecting...';
-  $('call-modal').style.display = 'flex';
+  $('call-modal').classList.add('is-shown');
+  $('call-modal').classList.remove('is-hidden');
 
   state.activeCallPeerConnection = new RTCPeerConnection(getRtcConfig());
   state.localMediaStream.getTracks().forEach(track => {
@@ -174,7 +178,8 @@ export async function acceptIncomingCall() {
 }
 
 export function declineIncomingCall() {
-  $('incoming-call-toast').style.display = 'none';
+  $('incoming-call-toast').classList.add('is-hidden');
+  $('incoming-call-toast').classList.remove('is-shown');
   if (state.pendingIncomingCall && state.ws && state.ws.readyState === WebSocket.OPEN) {
     state.ws.send(JSON.stringify({
       t: 'call_decline',
@@ -203,7 +208,8 @@ export function endCall(notifyRemote = true) {
   }
 
   stopCallTimer();
-  $('call-modal').style.display = 'none';
+  $('call-modal').classList.add('is-hidden');
+  $('call-modal').classList.remove('is-shown');
   const remoteAudio = $('remote-audio');
   if (remoteAudio) remoteAudio.srcObject = null;
   state.currentCallPeer = null;

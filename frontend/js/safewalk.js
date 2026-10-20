@@ -116,7 +116,10 @@ export function startSafeWalk(durationMinutes, note = '', recipients = 'everyone
   gpsInterval = setInterval(sampleGps, 20000);
 
   const chip = $('safewalk-chip');
-  if (chip) chip.style.display = 'inline-flex';
+  if (chip) {
+    chip.classList.add('is-shown');
+    chip.classList.remove('is-hidden');
+  }
 
   let warned = false;
   countdownInterval = setInterval(() => {
@@ -151,14 +154,18 @@ function updateChipDisplay(remainingMs) {
 function showExtensionPrompt() {
   const banner = $('safewalk-warn-banner');
   if (banner) {
-    banner.style.display = 'flex';
+    banner.classList.add('is-shown');
+    banner.classList.remove('is-hidden');
   }
 }
 
 export function extendSafeWalk(extraMinutes = 5) {
   targetExpiryTime += extraMinutes * 60 * 1000;
   const banner = $('safewalk-warn-banner');
-  if (banner) banner.style.display = 'none';
+  if (banner) {
+    banner.classList.add('is-hidden');
+    banner.classList.remove('is-shown');
+  }
   appendSystemMessage(`⏳ Safe walk timer extended by ${extraMinutes} min.`);
 }
 
@@ -170,10 +177,16 @@ export function stopSafeWalk() {
   releaseWakeLock();
 
   const chip = $('safewalk-chip');
-  if (chip) chip.style.display = 'none';
+  if (chip) {
+    chip.classList.add('is-hidden');
+    chip.classList.remove('is-shown');
+  }
 
   const banner = $('safewalk-warn-banner');
-  if (banner) banner.style.display = 'none';
+  if (banner) {
+    banner.classList.add('is-hidden');
+    banner.classList.remove('is-shown');
+  }
 }
 
 export function triggerSafeWalkAlert() {
