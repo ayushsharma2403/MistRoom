@@ -183,3 +183,18 @@ async def broadcast_peers():
             "available_rooms": available_room_names,
             "rooms_info": available_rooms_with_counts
         })
+
+
+async def broadcast_peer_delta(room: str, event_type: str, peer_id: str, peer_data: Optional[dict] = None):
+    """Broadcasts a peer_leave or peer_join delta to all non-ghost or room clients."""
+    payload = {
+        "t": event_type,
+        "peer_id": peer_id,
+        "room": room
+    }
+    if peer_data and event_type == "peer_join":
+        payload.update(peer_data)
+
+    for ws_client, c in list(clients.items()):
+        if c.get("room") == room:
+            await send_json(ws_client, payload)

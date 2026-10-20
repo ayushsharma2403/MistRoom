@@ -216,10 +216,18 @@ export function signChallenge(nonceBase64) {
   return bytesToBase64(sigBytes);
 }
 
+export function generateEphemeralIdentity() {
+  const privKey = ed25519.utils.randomPrivateKey();
+  const pubKey = ed25519.getPublicKey(privKey);
+  const peerId = derivePeerIdFromPk(pubKey);
+  return { privKey, pubKey, peerId };
+}
+
 export function signMessageEnvelope(room, id, ts, n, c) {
-  if (!state.identity || !state.identity.privKey) return '';
+  const activeIdentity = (state.isStealthMode && state.ghostIdentity) ? state.ghostIdentity : state.identity;
+  if (!activeIdentity || !activeIdentity.privKey) return '';
   const messageData = new TextEncoder().encode(`${room}|${id}|${ts}|${n}|${c}`);
-  const sigBytes = ed25519.sign(messageData, state.identity.privKey);
+  const sigBytes = ed25519.sign(messageData, activeIdentity.privKey);
   return bytesToBase64(sigBytes);
 }
 

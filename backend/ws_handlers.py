@@ -11,7 +11,8 @@ from pydantic import BaseModel, Field, ValidationError
 from backend.state import (
     clients, seen_ids, get_room_history, active_beacons, send_json, broadcast_peers,
     RESERVED_HANDLES, format_displayed_handle, cleanup_expired_beacons, peer_beacon_times,
-    peer_call_times, need_owners, is_reserved_handle, is_seen_id, record_seen_id
+    peer_call_times, need_owners, is_reserved_handle, is_seen_id, record_seen_id,
+    broadcast_peer_delta
 )
 
 B32_ALPHABET = "abcdefghijklmnopqrstuvwxyz234567"
@@ -70,6 +71,11 @@ class JoinModel(BaseModel):
 class SwitchRoomModel(BaseModel):
     t: Literal["switch_room"]
     room: str = Field(min_length=1, max_length=30)
+
+
+class SetGhostModel(BaseModel):
+    t: Literal["set_ghost"]
+    on: bool
 
 
 class EnvelopeModel(BaseModel):
@@ -224,6 +230,41 @@ async def handle_switch_room_v2(ws: WebSocket, msg_data: dict):
     await broadcast_peers()
 
 
+async def handle_set_ghost(ws: WebSocket, msg_data: dict):
+    if not clients.get(ws, {}).get("peer_id"):
+        await send_json(ws, {"t": "error", "code": "not_joined"})
+        return
+
+    try:
+        parsed = SetGhostModel(**msg_data)
+    except ValidationError:
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+
+    client_info = clients[ws]
+    old_ghost = client_info.get("ghost", False)
+    new_ghost = parsed.on
+    room = client_info.get("room", "global")
+    peer_id = client_info.get("peer_id")
+
+    if old_ghost == new_ghost:
+        return
+
+    client_info["ghost"] = new_ghost
+    if new_ghost:
+        # Peer is now ghost: remove from people by broadcasting peer_leave delta
+        await broadcast_peer_delta(room, "peer_leave", peer_id)
+    else:
+        # Peer disabled ghost: re-add to people by broadcasting peer_join delta
+        peer_data = {
+            "name": client_info.get("name"),
+            "pk": client_info.get("pk", "")
+        }
+        await broadcast_peer_delta(room, "peer_join", peer_id, peer_data)
+
+    await broadcast_peers()
+
+
 async def handle_msg_v2(ws: WebSocket, msg_data: dict):
     if not clients.get(ws, {}).get("name"):
         await send_json(ws, {"t": "error", "code": "bad_frame"})
@@ -261,14 +302,19 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
     # Add id ONLY AFTER the signature has verified
     record_seen_id(current_room, mid, time.time())
 
-    sender_peer_id = clients[ws]["peer_id"]
+    is_ghost = clients[ws].get("ghost", False)
     derived_from_pk = derive_peer_id_from_pk(parsed.pk)
-    if derived_from_pk != sender_peer_id:
-        await send_json(ws, {"t": "error", "code": "bad_frame"})
-        return
+
+    if not is_ghost:
+        sender_peer_id = clients[ws]["peer_id"]
+        if derived_from_pk != sender_peer_id:
+            await send_json(ws, {"t": "error", "code": "bad_frame"})
+            return
+    else:
+        # When ghost is on, messages carry ephemeral pk and derived ephemeral peer_id
+        sender_peer_id = derived_from_pk
 
     current_room = clients[ws]["room"]
-    is_ghost = clients[ws].get("ghost", False)
     display_name = "Ghost" if is_ghost else format_displayed_handle(clients[ws]["name"], sender_peer_id, current_room)
 
     # Calculate count of other non-ghost peers in the room at send time for delivery ticks

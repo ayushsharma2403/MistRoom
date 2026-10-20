@@ -6,6 +6,7 @@ import { appendSystemMessage, renderPeers } from './ui.js';
 import { DB_NAME } from './outbox.js';
 import { LOG_DB_NAME } from './harassment_log.js';
 import { addTrustedAuthority, setMyBadge, getMyBadge } from './badges.js';
+import { generateEphemeralIdentity } from './crypto.js';
 
 export const WORDLIST = [
   'alpha', 'beacon', 'cipher', 'delta', 'echo', 'falcon', 'ghost', 'harbor',
@@ -201,13 +202,28 @@ export function setupSettingsUI() {
       const ghostChip = $('ghost-chip');
       if (ghostChip) ghostChip.style.display = state.isStealthMode ? 'inline-flex' : 'none';
 
+      if (state.isStealthMode) {
+        // Generate random Ed25519 key used only for signing while ghost is on
+        state.ghostIdentity = generateEphemeralIdentity();
+
+        // Close existing data channels and peer connections on enabling ghost
+        if (state.meshPeers) {
+          for (const [, peer] of state.meshPeers) {
+            try {
+              if (peer.dc) peer.dc.close();
+              if (peer.pc) peer.pc.close();
+            } catch (e) {}
+          }
+          state.meshPeers.clear();
+        }
+      } else {
+        state.ghostIdentity = null;
+      }
+
       if (state.ws && state.ws.readyState === WebSocket.OPEN) {
         state.ws.send(JSON.stringify({
-          t: 'join',
-          name: state.isStealthMode ? 'Ghost' : state.currentNickname,
-          peer_id: state.myPeerId,
-          room: state.currentRoom,
-          ghost: state.isStealthMode
+          t: 'set_ghost',
+          on: state.isStealthMode
         }));
       }
     });

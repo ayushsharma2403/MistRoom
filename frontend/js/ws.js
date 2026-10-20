@@ -201,6 +201,37 @@ export function connectWebSocket(onSwitchRoom) {
       handleIncomingFilePacket(data.data);
     }
 
+    if (data.t === 'peer_leave' && data.peer_id) {
+      state.currentPeersList = (state.currentPeersList || []).filter(p => p.peer_id !== data.peer_id);
+      renderPeers(state.currentPeersList);
+      const peer = state.meshPeers.get(data.peer_id);
+      if (peer) {
+        try {
+          if (peer.dc) peer.dc.close();
+          if (peer.pc) peer.pc.close();
+        } catch (e) {}
+        state.meshPeers.delete(data.peer_id);
+      }
+      renderMeshTopology();
+    }
+
+    if (data.t === 'peer_join' && data.peer_id) {
+      if (!(state.currentPeersList || []).some(p => p.peer_id === data.peer_id)) {
+        state.currentPeersList.push({
+          peer_id: data.peer_id,
+          name: data.name,
+          room: data.room || state.currentRoom,
+          pk: data.pk || ''
+        });
+        renderPeers(state.currentPeersList);
+        if (data.peer_id !== state.myPeerId && !state.meshPeers.has(data.peer_id)) {
+          const isInitiator = state.myPeerId < data.peer_id;
+          initWebRTCPeer(data.peer_id, isInitiator);
+        }
+        renderMeshTopology();
+      }
+    }
+
     if (data.t === 'people') {
       state.currentPeersList = data.people || [];
       renderPeers(state.currentPeersList);

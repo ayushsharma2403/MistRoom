@@ -19,7 +19,7 @@ from backend.routes import router as rest_router, LAN_URL
 from backend.ws_handlers import (
     handle_join_v2, handle_switch_room_v2, handle_msg_v2,
     handle_msg_ack_v2, handle_signaling_v2, handle_beacon_v2,
-    handle_need_resolved_v2
+    handle_need_resolved_v2, handle_set_ghost
 )
 
 app = FastAPI(title="MistRoom")
@@ -193,6 +193,8 @@ async def websocket_endpoint(ws: WebSocket):
                 await handle_beacon_v2(ws, msg_data)
             elif event_type == "need_resolved":
                 await handle_need_resolved_v2(ws, msg_data)
+            elif event_type == "set_ghost":
+                await handle_set_ghost(ws, msg_data)
             elif event_type == "msg_ack":
                 await handle_msg_ack_v2(ws, msg_data)
             elif event_type in ("webrtc_offer", "webrtc_answer", "webrtc_ice",

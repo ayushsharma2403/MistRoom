@@ -736,7 +736,8 @@ export async function sendMessage(rawText, explicitCat = null) {
   const ts = Date.now();
   const envelope = encryptEnvelope(rawText, state.cryptoKey);
 
-  const pkB64 = state.identity ? bytesToBase64(state.identity.pubKey) : '';
+  const activeIdentity = (state.isStealthMode && state.ghostIdentity) ? state.ghostIdentity : state.identity;
+  const pkB64 = activeIdentity ? bytesToBase64(activeIdentity.pubKey) : '';
   const sigB64 = signMessageEnvelope(state.currentRoom, mid, ts, envelope.n, envelope.c);
 
   const payload = {
