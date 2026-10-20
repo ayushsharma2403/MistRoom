@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -54,13 +54,33 @@ async def add_security_headers(request, call_next):
     response.headers["Referrer-Policy"] = "no-referrer"
 
     if path in ("/", "/index.html", "/sw.js"):
+        if _INDEX_ETAG and path in ("/", "/index.html") and if_none_match == _INDEX_ETAG:
+            return Response(
+                status_code=304,
+                headers={
+                    "Content-Security-Policy": (
+                        "default-src 'self'; "
+                        "script-src 'self'; "
+                        "worker-src 'self'; "
+                        "style-src 'self'; "
+                        "img-src 'self' blob: data:; "
+                        "connect-src 'self' ws: wss:; "
+                        "media-src 'self' blob:; "
+                        "manifest-src 'self'; "
+                        "object-src 'none'; "
+                        "base-uri 'none'"
+                    ),
+                    "X-Content-Type-Options": "nosniff",
+                    "Referrer-Policy": "no-referrer",
+                    "Cache-Control": "no-cache",
+                    "ETag": _INDEX_ETAG,
+                },
+            )
         response.headers["Cache-Control"] = "no-cache"
         if path == "/sw.js":
             response.headers["Service-Worker-Allowed"] = "/"
         if _INDEX_ETAG and path in ("/", "/index.html"):
             response.headers["ETag"] = _INDEX_ETAG
-            if if_none_match == _INDEX_ETAG:
-                response.status_code = 304
     elif path.startswith("/assets/") or (len(Path(path).stem.split(".")) > 1):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
