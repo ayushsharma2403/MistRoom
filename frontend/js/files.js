@@ -6,7 +6,75 @@ import { encryptMessage, decryptMessage } from './crypto.js';
 import { broadcastOverP2P, sendDeliveryAck } from './mesh.js';
 import { appendMessageToUI, appendSystemMessage } from './ui.js';
 
-export const CHUNK_SIZE = 16384;
+// 9216 raw bytes produce exactly 12,288 bytes (12 KB) in standard base64 encoding
+export const CHUNK_SIZE = 9216;
+
+let lastRateLimitTime = 0;
+if (typeof window !== 'undefined') {
+  window.addEventListener('mist_ws_error', e => {
+    if (e.detail && e.detail.code === 'rate_limited') {
+      lastRateLimitTime = Date.now();
+    }
+  });
+}
+
+async function sendChunkOverDataChannel(dc, packet) {
+  const serialized = JSON.stringify(packet);
+  if (dc.bufferedAmount > 65536) {
+    await new Promise(resolve => {
+      dc.bufferedAmountLowThreshold = 32768;
+      const onLow = () => {
+        dc.removeEventListener('bufferedamountlow', onLow);
+        resolve();
+      };
+      dc.addEventListener('bufferedamountlow', onLow);
+    });
+  }
+  dc.send(serialized);
+}
+
+export async function dispatchFileChunkWithFlowControl(chunkPayload, targetPeerId) {
+  let dc = null;
+  if (targetPeerId) {
+    const peer = state.meshPeers.get(targetPeerId);
+    if (peer && peer.dc && peer.dc.readyState === 'open') {
+      dc = peer.dc;
+    }
+  }
+
+  if (dc) {
+    // Data-channel send: wait on bufferedAmountLowThreshold, no fixed sleeps
+    await sendChunkOverDataChannel(dc, chunkPayload);
+    return true;
+  }
+
+  // Client relay send: at most 30 chunks/s (~34 ms between chunks), 12 KB base64 chunks;
+  // on {"t":"error","code":"rate_limited"} wait 500 ms and resend that chunk (max 5 resends per chunk, then fail the transfer with a visible message).
+  let resends = 0;
+  while (resends <= 5) {
+    if (Date.now() - lastRateLimitTime < 500) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+    const sendTime = Date.now();
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({ t: 'p2p_file', target: targetPeerId, data: chunkPayload }));
+    }
+
+    // Wait 34 ms to enforce at most 30 chunks/s
+    await new Promise(r => setTimeout(r, 34));
+
+    if (lastRateLimitTime > sendTime) {
+      resends++;
+      if (resends > 5) {
+        throw new Error('File transfer failed: rate limited by server after 5 retry attempts.');
+      }
+      await new Promise(r => setTimeout(r, 500));
+      continue;
+    }
+    return true;
+  }
+  throw new Error('File transfer failed: rate limited by server after 5 retry attempts.');
+}
 
 export function dispatchFilePacket(packet) {
   let sentViaP2P = false;
@@ -124,16 +192,19 @@ export async function sendEncryptedFile(file) {
       room: state.currentRoom
     };
 
-    dispatchFilePacket(chunkPayload);
+    try {
+      await dispatchFileChunkWithFlowControl(chunkPayload, targetPeerId);
+    } catch (err) {
+      if (progressBox) progressBox.style.display = 'none';
+      appendSystemMessage(`❌ File transfer failed: ${err.message || 'Transfer rate limited.'}`);
+      return;
+    }
 
     const pct = Math.round(((i + 1) / totalChunks) * 100);
     if (progressPct && progressBar) {
       progressPct.textContent = `${pct}%`;
       progressBar.style.width = `${pct}%`;
     }
-
-    // Backpressure: yield each chunk to allow event loop and WebRTC buffers to drain
-    await new Promise(r => setTimeout(r, 8));
   }
 
   setTimeout(() => {

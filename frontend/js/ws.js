@@ -171,6 +171,10 @@ export function connectWebSocket(onSwitchRoom) {
       renderBeaconListModal();
     }
 
+    if (data.t === 'error') {
+      window.dispatchEvent(new CustomEvent('mist_ws_error', { detail: data }));
+    }
+
     if (data.t === 'need_resolved') {
       if (data.id) {
         const existing = state.openNeeds.get(data.id);

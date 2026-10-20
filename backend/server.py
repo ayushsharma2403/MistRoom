@@ -106,6 +106,19 @@ class TokenBucket:
         return True
 
 
+class FileTokenBucket:
+    """Per-connection token bucket for p2p_file frames: 400 per 10 s."""
+    def __init__(self):
+        self.timestamps = deque(maxlen=400)
+
+    def allow(self) -> bool:
+        now = time.monotonic()
+        if len(self.timestamps) == 400 and now - self.timestamps[0] < 10.0:
+            return False
+        self.timestamps.append(now)
+        return True
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     # Origin verification: Origin host must equal Host header
@@ -134,6 +147,7 @@ async def websocket_endpoint(ws: WebSocket):
 
     clients[ws] = {"name": None, "peer_id": None, "room": None, "pk": None}
     rate_limiter = TokenBucket()
+    file_rate_limiter = FileTokenBucket()
 
     try:
         while True:
@@ -142,13 +156,6 @@ async def websocket_endpoint(ws: WebSocket):
             if len(raw_text.encode("utf-8")) > 64 * 1024:
                 await ws.close(code=1009, reason="Message too large")
                 break
-
-            # Rate limit check
-            if not rate_limiter.allow():
-                await ws.send_text(json.dumps({
-                    "t": "error", "code": "rate_limited", "text": "Too many messages"
-                }))
-                continue
 
             try:
                 msg_data = json.loads(raw_text)
@@ -161,6 +168,14 @@ async def websocket_endpoint(ws: WebSocket):
                 continue
 
             event_type = msg_data.get("t")
+
+            # Rate limit check: separate bucket for p2p_file frames
+            limiter = file_rate_limiter if event_type == "p2p_file" else rate_limiter
+            if not limiter.allow():
+                await ws.send_text(json.dumps({
+                    "t": "error", "code": "rate_limited", "text": "Too many messages"
+                }))
+                continue
 
             if event_type not in ("join", "pong"):
                 client_info = clients.get(ws)
