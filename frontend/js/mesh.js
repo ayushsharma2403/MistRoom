@@ -164,6 +164,7 @@ export function attachDataChannelEvents(dc, targetPeerId) {
 }
 
 export function initWebRTCPeer(targetPeerId, isInitiator) {
+  if (state.webrtcAvailable === false || typeof window.RTCPeerConnection === 'undefined') return;
   if (state.meshPeers.has(targetPeerId)) return;
   const pc = new RTCPeerConnection(getRtcConfig());
   state.meshPeers.set(targetPeerId, { pc, dc: null });

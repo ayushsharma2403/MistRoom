@@ -95,6 +95,26 @@ async function handleJoin() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (typeof window.RTCPeerConnection === 'undefined') {
+    state.webrtcAvailable = false;
+    const hideSelectors = [
+      '#start-voice-call-btn',
+      '#serverless-join-btn',
+      '#menu-serverless-btn',
+      '#tab-btn-mesh',
+      '#panel-mesh',
+      '#menu-mesh-btn',
+      '#mesh-counter'
+    ];
+    hideSelectors.forEach(sel => {
+      const el = document.querySelector(sel);
+      if (el) el.classList.add('u-hidden');
+    });
+    appendSystemMessage('WebRTC is unavailable in this environment. P2P mesh and voice calls disabled; relay active.');
+  } else {
+    state.webrtcAvailable = true;
+  }
+
   initIndexedDB();
   initTriageRules();
 

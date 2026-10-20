@@ -503,15 +503,15 @@ export function appendMessageToUI(msg, autoScroll = true) {
 
   const textNode = document.createElement('div');
   textNode.className = 'msg-text';
-  if (msg.unreadable) {
-    textNode.style.color = '#94A3B8';
-    textNode.style.fontStyle = 'italic';
+  if (typeof msg.text === 'string') {
+    textNode.textContent = msg.text;
+  } else if (msg.unreadable) {
     textNode.textContent = '[unreadable message]';
   } else {
-    textNode.textContent = msg.text || '';
+    textNode.textContent = '';
   }
 
-  if (msg.text || msg.unreadable) bubble.append(meta, textNode);
+  bubble.append(meta, textNode);
   if (msg.file) {
     const isImage = isSafePreviewMime(msg.file.type);
     if (isImage && msg.file.url) {

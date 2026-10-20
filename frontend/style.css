@@ -2,6 +2,10 @@
    Mission Focus: Women's Safety, Disaster Relief, Anonymous Civil Mesh
 */
 
+.u-hidden {
+  display: none !important;
+}
+
 :root {
   --bg-main: #060913;
   --bg-mesh: radial-gradient(circle at 15% 15%, rgba(6, 214, 160, 0.08) 0%, transparent 40%),

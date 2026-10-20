@@ -133,6 +133,9 @@ export function resetActiveBootstrap() {
  * Step 1: Device A starts session (Initiator: creates offer)
  */
 export async function startServerlessInitiator() {
+  if (state.webrtcAvailable === false || typeof window.RTCPeerConnection === 'undefined') {
+    throw new Error('WebRTC is not available in this browser environment.');
+  }
   resetActiveBootstrap();
 
   const pc = new RTCPeerConnection({ iceServers: [] });
@@ -218,6 +221,10 @@ export async function processOfferAndCreateAnswer(offerText) {
   const remotePeerId = derivePeerIdFromPk(base64ToBytes(offerObj.pk));
   if (offerObj.peer_id && offerObj.peer_id !== remotePeerId) {
     throw new Error('Offer Peer ID mismatch');
+  }
+
+  if (state.webrtcAvailable === false || typeof window.RTCPeerConnection === 'undefined') {
+    throw new Error('WebRTC is not available in this browser environment.');
   }
 
   const pc = new RTCPeerConnection({ iceServers: [] });

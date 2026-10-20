@@ -25,6 +25,9 @@ export function stopCallTimer() {
 
 export async function startCall(peer) {
   if (!peer) return;
+  if (state.webrtcAvailable === false || typeof window.RTCPeerConnection === 'undefined') {
+    return alert('WebRTC voice calling is unavailable in this environment.');
+  }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     return alert('Voice calling requires microphone access in your browser.');
   }
