@@ -73,7 +73,7 @@
             </svg>
           </button>
         </div>
-        <div id="passkey-error" class="input-inline-error" style="display:none;color:#ef4444;font-size:12px;margin-top:6px;font-weight:500;">
+        <div id="passkey-error" class="input-inline-error u-0d16411a">
           Passkey is required (minimum 8 characters)
         </div>
       </div>
@@ -97,10 +97,10 @@
           <span class="btn-liquid-text">Enter Secure Mesh</span>
           <span class="btn-liquid-arrow">→</span>
         </button>
-        <button type="button" id="serverless-join-btn" class="btn-action-sm" style="margin-top:10px;width:100%;background:rgba(6,214,160,0.15);color:var(--primary);border:1px solid rgba(6,214,160,0.3);font-weight:700;">
+        <button type="button" id="serverless-join-btn" class="btn-action-sm u-115a27b4">
           ⚡ Connect without Server (QR / P2P)
         </button>
-        <button type="button" id="restore-phrase-btn" class="btn-action-sm" style="margin-top:8px;width:100%;background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1);">
+        <button type="button" id="restore-phrase-btn" class="btn-action-sm u-eed62598">
           🔑 Restore from Recovery Phrase
         </button>
       </div>
@@ -113,18 +113,18 @@
 </div>
 
 <!-- Restore From Phrase Modal -->
-<div id="restore-modal" class="modal-overlay" style="display:none;">
-  <div class="liquid-card" style="max-width:440px;width:100%;padding:24px;">
-    <div class="settings-modal-header" style="margin-bottom:12px;">
+<div id="restore-modal" class="modal-overlay u-c8be1ccb">
+  <div class="liquid-card u-ea265e0c">
+    <div class="settings-modal-header u-3ef1fa1a">
       <h3>🔑 Restore Identity</h3>
       <button type="button" id="close-restore-btn" class="btn-close-modal">&times;</button>
     </div>
     <p class="settings-hint">Enter your 12-word recovery phrase separated by spaces. This will regenerate your exact Ed25519 keypair and peer ID.</p>
-    <div style="margin:16px 0;">
-      <textarea id="restore-phrase-input" placeholder="abandon ability able about above..." rows="4" style="width:100%;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:12px;color:#fff;padding:12px;font-family:var(--font-mono);font-size:13px;resize:none;"></textarea>
-      <div id="restore-error" style="display:none;color:#ef4444;font-size:12px;margin-top:6px;font-weight:500;">Invalid 12-word recovery phrase.</div>
+    <div class="u-598bcd3f">
+      <textarea class="u-fd044ab3" id="restore-phrase-input" placeholder="abandon ability able about above..." rows="4"></textarea>
+      <div class="u-0d16411a" id="restore-error">Invalid 12-word recovery phrase.</div>
     </div>
-    <button type="button" id="submit-restore-btn" class="btn-liquid-enter" style="width:100%;justify-content:center;">
+    <button type="button" id="submit-restore-btn" class="btn-liquid-enter u-2976360a">
       Validate & Restore Identity
     </button>
   </div>
@@ -141,11 +141,11 @@
       <div class="room-badge-container">
         <span class="badge badge-room" id="active-room-badge">#global</span>
       </div>
-      <span id="ghost-chip" class="badge" style="display:none;background:rgba(217,70,239,0.2);color:#f472b6;border:1px solid rgba(217,70,239,0.4);font-size:11px;padding:3px 8px;border-radius:99px;">👻 Ghost on</span>
-      <span id="safewalk-chip" class="badge" style="display:none;background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-size:11px;padding:3px 8px;border-radius:99px;cursor:pointer;" title="Tap to view / Long-press for duress SOS">🚶 Safe Walk: --:--</span>
+      <span id="ghost-chip" class="badge u-5ff9fe5c">👻 Ghost on</span>
+      <span id="safewalk-chip" class="badge u-99e9127e" title="Tap to view / Long-press for duress SOS">🚶 Safe Walk: --:--</span>
       <div class="security-badges">
         <span class="badge badge-mesh" id="mesh-counter">Mesh: 0 P2P</span>
-        <span class="badge" id="ble-header-chip" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);cursor:pointer;" title="Tap for BLE Diagnostics">📶 BLE: Off</span>
+        <span class="badge u-0cc66a8f" id="ble-header-chip" title="Tap for BLE Diagnostics">📶 BLE: Off</span>
       </div>
     </div>
 
@@ -158,15 +158,15 @@
       <button type="button" id="logout-btn" class="glass-btn-logout desk-only" title="Leave room">Disconnect</button>
 
       <!-- Mobile Compact ⋯ Menu Button -->
-      <div class="header-menu-wrap" style="position:relative;">
+      <div class="header-menu-wrap u-87db2275">
         <button type="button" id="header-more-btn" class="glass-icon-btn" title="More options" aria-label="Menu">⋯</button>
-        <div id="header-dropdown-menu" class="liquid-card" style="display:none;position:absolute;right:0;top:100%;margin-top:6px;min-width:160px;z-index:999;padding:6px;flex-direction:column;gap:4px;">
-          <button type="button" id="menu-settings-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">⚙️ Settings</button>
-          <button type="button" id="menu-serverless-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:var(--primary);padding:8px;font-size:13px;border-radius:6px;cursor:pointer;font-weight:700;">⚡ Offline QR Connect</button>
-          <button type="button" id="menu-needs-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">📋 Needs Board</button>
-          <button type="button" id="menu-mesh-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">⚡ Mesh Info</button>
-          <div style="height:1px;background:rgba(255,255,255,0.1);margin:4px 0;"></div>
-          <button type="button" id="menu-logout-btn" class="dropdown-item-btn" style="width:100%;text-align:left;background:transparent;border:none;color:#ef4444;padding:8px;font-size:13px;border-radius:6px;cursor:pointer;">🚪 Disconnect</button>
+        <div id="header-dropdown-menu" class="liquid-card u-bc7f017a">
+          <button type="button" id="menu-settings-btn" class="dropdown-item-btn u-8a03bd50">⚙️ Settings</button>
+          <button type="button" id="menu-serverless-btn" class="dropdown-item-btn u-b3ceedc4">⚡ Offline QR Connect</button>
+          <button type="button" id="menu-needs-btn" class="dropdown-item-btn u-8a03bd50">📋 Needs Board</button>
+          <button type="button" id="menu-mesh-btn" class="dropdown-item-btn u-8a03bd50">⚡ Mesh Info</button>
+          <div class="u-543c19db"></div>
+          <button type="button" id="menu-logout-btn" class="dropdown-item-btn u-629b33ea">🚪 Disconnect</button>
         </div>
       </div>
 
@@ -178,19 +178,19 @@
   </header>
 
   <!-- Public Emergency Beacon Pinned Banner -->
-  <div id="beacon-banner" class="beacon-banner glass-banner" style="display:none;background:rgba(220,38,38,0.2);border-left:4px solid #ef4444;padding:8px 16px;cursor:pointer;display:none;justify-content:space-between;align-items:center;">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-weight:700;color:#ef4444;">🚨 Public emergency beacon (not encrypted):</span>
-      <span id="beacon-banner-text" style="color:#f87171;"></span>
+  <div id="beacon-banner" class="beacon-banner glass-banner u-1093f5cf">
+    <div class="u-e3f61041">
+      <span class="u-47751984">🚨 Public emergency beacon (not encrypted):</span>
+      <span class="u-9c5c7557" id="beacon-banner-text"></span>
     </div>
-    <span id="beacon-banner-count" class="badge-mini" style="background:#ef4444;color:#fff;border-radius:12px;padding:2px 8px;font-size:11px;">+0 more</span>
+    <span id="beacon-banner-count" class="badge-mini u-10ae6878">+0 more</span>
   </div>
 
-  <div id="sos-banner" class="sos-banner glass-banner" style="display:none;"></div>
+  <div id="sos-banner" class="sos-banner glass-banner u-c8be1ccb"></div>
 
   <div class="main-body">
     <main class="chat-container">
-      <div id="dm-banner" class="dm-banner glass-dm-bar" style="display:none;">
+      <div id="dm-banner" class="dm-banner glass-dm-bar u-c8be1ccb">
         <span class="dm-banner-icon">🔒</span>
         <div class="dm-banner-text">
           Encrypted 1-on-1 Direct Channel with <strong id="dm-peer-name">Peer</strong>
@@ -204,7 +204,7 @@
       <div id="messages-list" class="messages-list" role="log" aria-live="polite"></div>
 
       <footer class="composer-container glass-composer">
-        <div id="file-progress-container" class="file-progress-container" style="display:none;">
+        <div id="file-progress-container" class="file-progress-container u-c8be1ccb">
           <div class="file-progress-info">
             <span id="file-progress-name">Uploading encrypted file...</span>
             <span id="file-progress-percent">0%</span>
@@ -215,27 +215,27 @@
         </div>
 
         <form id="composer-form" class="composer-liquid-form">
-          <input type="file" id="file-input" style="display:none;" />
+          <input class="u-c8be1ccb" type="file" id="file-input" />
 
           <!-- Expandable Plus Menu for Secondary Tools -->
-          <div class="composer-plus-wrap" style="position:relative;">
-            <button type="button" id="composer-plus-btn" class="btn-3d-action" title="More actions (File, Safety, GPS)" aria-label="Attachments and Safety" style="font-size:18px;font-weight:700;">
+          <div class="composer-plus-wrap u-87db2275">
+            <button type="button" id="composer-plus-btn" class="btn-3d-action u-225c8eb1" title="More actions (File, Safety, GPS)" aria-label="Attachments and Safety">
               +
             </button>
-            <div id="composer-plus-dropdown" class="liquid-card" style="display:none;position:absolute;left:0;bottom:100%;margin-bottom:8px;min-width:180px;z-index:999;padding:6px;flex-direction:column;gap:4px;">
-              <button type="button" id="safewalk-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(245,158,11,0.15);border:none;color:#fbbf24;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:700;">
+            <div id="composer-plus-dropdown" class="liquid-card u-eef8b500">
+              <button type="button" id="safewalk-btn" class="dropdown-item-btn u-f79ffd2c">
                 🚶 Safe Walk Timer
               </button>
-              <button type="button" id="incident-log-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(239,71,111,0.15);border:none;color:#f87171;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;font-weight:700;">
+              <button type="button" id="incident-log-btn" class="dropdown-item-btn u-9c823a0f">
                 📝 Report Incident Log
               </button>
-              <button type="button" id="women-safety-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(217,70,239,0.15);border:none;color:#f472b6;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;">
+              <button type="button" id="women-safety-btn" class="dropdown-item-btn u-169312cc">
                 🛡️ Women Safety
               </button>
-              <button type="button" id="gps-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.06);border:none;color:#fff;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;">
+              <button type="button" id="gps-btn" class="dropdown-item-btn u-45c92839">
                 📍 Attach GPS
               </button>
-              <button type="button" id="attach-file-btn" class="dropdown-item-btn" style="width:100%;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.06);border:none;color:#fff;padding:10px 8px;font-size:13px;border-radius:8px;cursor:pointer;">
+              <button type="button" id="attach-file-btn" class="dropdown-item-btn u-45c92839">
                 📎 Share File/Photo
               </button>
             </div>
@@ -269,10 +269,10 @@
 
     <aside class="sidebar glass-sidebar" id="peers-sidebar">
       <!-- Navigation Tabs: Peers | Needs Board | Mesh -->
-      <div class="sidebar-tabs" style="display:flex;gap:4px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;margin-bottom:12px;">
-        <button type="button" id="tab-btn-peers" class="glass-tab-btn active" style="flex:1;padding:6px 4px;font-size:12px;background:rgba(255,255,255,0.15);border:none;border-radius:6px;color:#fff;cursor:pointer;">Peers</button>
-        <button type="button" id="tab-btn-needs" class="glass-tab-btn" style="flex:1;padding:6px 4px;font-size:12px;background:transparent;border:none;border-radius:6px;color:#94a3b8;cursor:pointer;">Needs Board</button>
-        <button type="button" id="tab-btn-mesh" class="glass-tab-btn" style="flex:1;padding:6px 4px;font-size:12px;background:transparent;border:none;border-radius:6px;color:#94a3b8;cursor:pointer;">Mesh</button>
+      <div class="sidebar-tabs u-0a71e56d">
+        <button type="button" id="tab-btn-peers" class="glass-tab-btn active u-6b597d9a">Peers</button>
+        <button type="button" id="tab-btn-needs" class="glass-tab-btn u-fdb4343d">Needs Board</button>
+        <button type="button" id="tab-btn-mesh" class="glass-tab-btn u-fdb4343d">Mesh</button>
       </div>
 
       <!-- Panel 1: Peers & Rooms -->
@@ -296,38 +296,38 @@
       </div>
 
       <!-- Panel 2: Needs Board -->
-      <div id="panel-needs" class="sidebar-tab-panel" style="display:none;">
+      <div id="panel-needs" class="sidebar-tab-panel u-c8be1ccb">
         <div class="sidebar-section">
           <div class="section-header-flex">
             <h3>Open Emergency Needs</h3>
             <span class="badge-mini" id="needs-counter">0 open</span>
           </div>
           <p class="settings-hint">Live open requests sorted by urgency & priority.</p>
-          <div id="needs-board-list" class="needs-items" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;padding-right:4px;"></div>
+          <div id="needs-board-list" class="needs-items u-d07cfc27"></div>
         </div>
       </div>
 
       <!-- Panel 3: Mesh Topology -->
-      <div id="panel-mesh" class="sidebar-tab-panel" style="display:none;">
+      <div id="panel-mesh" class="sidebar-tab-panel u-c8be1ccb">
         <div class="sidebar-section">
           <div class="section-header-flex">
             <h3>WebRTC / LAN Topology</h3>
             <span class="badge-mini" id="mesh-topo-count">0 nodes</span>
           </div>
           <p class="settings-hint">Connection type & hop distance to WebRTC mesh peers.</p>
-          <ul id="mesh-topology-list" class="mesh-topo-items" style="list-style:none;padding:0;display:flex;flex-direction:column;gap:6px;"></ul>
+          <ul id="mesh-topology-list" class="mesh-topo-items u-4f47f322"></ul>
         </div>
 
-        <div class="sidebar-section" style="margin-top:16px;">
+        <div class="sidebar-section u-8a359a76">
           <div class="section-header-flex">
             <h3>Bluetooth Mesh Neighbors</h3>
-            <span class="badge-mini" id="ble-topo-count" style="background:rgba(59,130,246,0.2);color:#60a5fa;">0 BLE</span>
+            <span class="badge-mini u-78b9cc72" id="ble-topo-count">0 BLE</span>
           </div>
           <p class="settings-hint">Direct 1-hop BLE neighbors (RSSI, battery, link state).</p>
-          <ul id="ble-neighbors-list" class="mesh-topo-items" style="list-style:none;padding:0;display:flex;flex-direction:column;gap:6px;">
-            <li style="font-size:12px;color:var(--text-muted);padding:6px 8px;">No BLE neighbors in range.</li>
+          <ul id="ble-neighbors-list" class="mesh-topo-items u-4f47f322">
+            <li class="u-41e4fd26">No BLE neighbors in range.</li>
           </ul>
-          <button type="button" id="btn-open-ble-diag" class="btn-action-sm" style="margin-top:10px;width:100%;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:6px;">
+          <button type="button" id="btn-open-ble-diag" class="btn-action-sm u-12916cae">
             📊 Open BLE Diagnostics & Counters
           </button>
         </div>
@@ -344,7 +344,7 @@
   </div>
 
   <!-- WebRTC P2P Voice Call Modal -->
-  <div id="call-modal" class="call-modal" style="display:none;">
+  <div id="call-modal" class="call-modal u-c8be1ccb">
     <div class="call-modal-content liquid-card">
       <div class="call-header">
         <h3 id="call-peer-title">P2P Encrypted Call</h3>
@@ -364,7 +364,7 @@
     </div>
   </div>
 
-  <div id="incoming-call-toast" class="incoming-call-toast liquid-card" style="display:none;">
+  <div id="incoming-call-toast" class="incoming-call-toast liquid-card u-c8be1ccb">
     <div class="incoming-call-info">
       <div class="incoming-avatar">📞</div>
       <div>
@@ -378,7 +378,7 @@
     </div>
   </div>
 
-  <div id="settings-modal" class="modal-overlay" style="display:none;">
+  <div id="settings-modal" class="modal-overlay u-c8be1ccb">
     <div class="liquid-card settings-card">
       <div class="settings-modal-header">
         <h2>Identity & Privacy Controls</h2>
@@ -389,10 +389,10 @@
         <h3>🔑 Cryptographic Identity Recovery</h3>
         <p class="settings-hint">Your mnemonic recovery phrase deterministically restores your Ed25519 identity keypair and peer ID on any device without accounts.</p>
         <div class="recovery-box">
-          <div id="recovery-phrase-display" class="recovery-phrase" style="letter-spacing:1px;font-family:var(--font-mono);font-size:13px;padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;">••••••••••••••••••••••••••••••••••••</div>
-          <div style="display:flex;gap:8px;margin-top:10px;">
+          <div id="recovery-phrase-display" class="recovery-phrase u-d57a17b5">••••••••••••••••••••••••••••••••••••</div>
+          <div class="u-3fed563e">
             <button type="button" id="show-recovery-btn" class="btn-action-sm">👁️ Reveal Recovery Phrase</button>
-            <button type="button" id="copy-recovery-btn" class="btn-action-sm" style="display:none;">📋 Copy Phrase</button>
+            <button type="button" id="copy-recovery-btn" class="btn-action-sm u-c8be1ccb">📋 Copy Phrase</button>
           </div>
         </div>
       </div>
@@ -400,12 +400,11 @@
       <div class="settings-section">
         <h3>🌐 WebRTC & Custom ICE</h3>
         <p class="settings-hint">By default, MistRoom operates host-only on local Wi-Fi/hotspot (zero external STUN requests). You can optionally provide your own STUN/TURN servers.</p>
-        <div style="margin-top:8px;">
-          <input 
+        <div class="u-b1ecc496">
+          <input class="u-9f533d87" 
             type="text" 
             id="custom-ice-input" 
             placeholder="stun:your-stun-server.org:3478, turn:..." 
-            style="width:100%;padding:10px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;font-size:12px;" 
           />
         </div>
       </div>
@@ -419,7 +418,7 @@
           </div>
           <input type="checkbox" id="stealth-mode-toggle" class="setting-checkbox" />
         </div>
-        <div class="setting-toggle-row" style="margin-top:12px;">
+        <div class="setting-toggle-row u-9374e842">
           <div>
             <strong>Send Public Beacons on SOS</strong>
             <p class="settings-hint">Broadcasts an unencrypted emergency alert to all rooms when SOS or Women Safety is pressed.</p>
@@ -437,11 +436,11 @@
           </div>
           <input type="checkbox" id="ble-mesh-toggle" class="setting-checkbox" />
         </div>
-        <div style="margin-top:8px;font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;">
+        <div class="u-5c2516a8">
           <span>Status: <strong id="ble-mesh-status">Inactive</strong></span>
           <span>Neighbors: <strong id="ble-neighbor-count">0</strong></span>
         </div>
-        <p class="settings-hint" style="margin-top:6px;color:#f59e0b;">
+        <p class="settings-hint u-4194fafe">
           ⚠️ Needs the Android/iOS app (native Bluetooth peripheral and background mesh support).
         </p>
       </div>
@@ -449,15 +448,15 @@
       <div class="settings-section">
         <h3>🏅 Trusted Authorities & Responder Badges</h3>
         <p class="settings-hint">Add authority public keys to verify responder badges. Import your signed responder badge if you are a verified medic/volunteer.</p>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
-          <input type="text" id="add-auth-name-input" placeholder="Authority Name (e.g. Red Cross, Delhi Camp 4)" style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;font-size:12px;" />
-          <input type="text" id="add-auth-pk-input" placeholder="Authority Ed25519 Public Key (Base64)" style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;font-size:12px;" />
-          <button type="button" id="btn-add-auth" class="btn-action-sm" style="padding:6px;background:rgba(6,214,160,0.2);color:var(--primary);border:1px solid rgba(6,214,160,0.4);">+ Add Trusted Authority</button>
+        <div class="u-1745561f">
+          <input class="u-fb6f94e5" type="text" id="add-auth-name-input" placeholder="Authority Name (e.g. Red Cross, Delhi Camp 4)" />
+          <input class="u-fb6f94e5" type="text" id="add-auth-pk-input" placeholder="Authority Ed25519 Public Key (Base64)" />
+          <button type="button" id="btn-add-auth" class="btn-action-sm u-f8b82611">+ Add Trusted Authority</button>
           
-          <div style="margin-top:10px;">
-            <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Import My Responder Badge (JSON):</label>
-            <textarea id="import-badge-input" rows="2" placeholder='{"v":1,"issuer_name":"...","role":"medic"...}' style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;font-size:11px;font-family:var(--font-mono);resize:none;margin-top:4px;"></textarea>
-            <button type="button" id="btn-save-badge" class="btn-action-sm" style="margin-top:4px;padding:6px;background:rgba(255,255,255,0.1);color:#fff;">Save Badge</button>
+          <div class="u-d8a81eac">
+            <label class="u-51664928">Import My Responder Badge (JSON):</label>
+            <textarea class="u-307cc1ab" id="import-badge-input" rows="2" placeholder='{"v":1,"issuer_name":"...","role":"medic"...}'></textarea>
+            <button type="button" id="btn-save-badge" class="btn-action-sm u-346c588b">Save Badge</button>
           </div>
         </div>
       </div>
@@ -473,9 +472,9 @@
       <div class="settings-section danger-zone">
         <h3>🚨 Emergency Panic Data Wipe</h3>
         <p class="settings-hint">Instantly obliterates all local cipher stores, IndexedDB outbox queues, room keys, and cache from this browser.</p>
-        <div style="margin:8px 0;display:flex;align-items:center;gap:8px;">
+        <div class="u-da3529b1">
           <input type="checkbox" id="wipe-include-log-checkbox" />
-          <label for="wipe-include-log-checkbox" style="font-size:12px;color:#fca5a5;font-weight:600;">Include incident evidence log (WARNING: irrecoverably destroys legal evidence)</label>
+          <label class="u-ccc6ef04" for="wipe-include-log-checkbox">Include incident evidence log (WARNING: irrecoverably destroys legal evidence)</label>
         </div>
         <button type="button" id="panic-wipe-btn" class="btn-panic-wipe">⚠️ Wipe Everything & Reset</button>
       </div>
@@ -483,18 +482,18 @@
   </div>
 
   <!-- Emergency Beacon Consent Modal -->
-  <div id="beacon-consent-modal" class="modal-overlay" style="display:none;">
-    <div class="liquid-card" style="max-width:440px;padding:24px;text-align:center;">
-      <div style="font-size:36px;margin-bottom:12px;">🚨</div>
-      <h3 style="margin-bottom:8px;color:#fff;">Emergency Alert Broadcast</h3>
-      <p style="color:#cbd5e1;font-size:13px;line-height:1.5;margin-bottom:20px;">
+  <div id="beacon-consent-modal" class="modal-overlay u-c8be1ccb">
+    <div class="liquid-card u-e8a9b11c">
+      <div class="u-607c6196">🚨</div>
+      <h3 class="u-4cb1cee0">Emergency Alert Broadcast</h3>
+      <p class="u-d636c463">
         Would you like to send a <strong>Public emergency beacon (unencrypted)</strong> to all active rooms and peers for immediate rescue, or keep this alert encrypted only within <strong>#<span id="consent-room-name">global</span></strong>?
       </p>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <button type="button" id="btn-consent-beacon" class="btn-liquid-enter" style="background:#ef4444;justify-content:center;">
+      <div class="u-b32a606a">
+        <button type="button" id="btn-consent-beacon" class="btn-liquid-enter u-363ad459">
           📡 Send Public Beacon + Room Message
         </button>
-        <button type="button" id="btn-consent-room-only" class="btn-action-sm" style="padding:10px;background:rgba(255,255,255,0.1);color:#fff;">
+        <button type="button" id="btn-consent-room-only" class="btn-action-sm u-2b7f94d0">
           🔒 Room Only (Encrypted)
         </button>
       </div>
@@ -502,78 +501,78 @@
   </div>
 
   <!-- Serverless Offline QR / Text P2P Pairing Modal -->
-  <div id="serverless-modal" class="modal-overlay" style="display:none;">
-    <div class="liquid-card" style="max-width:480px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">
-      <div class="settings-modal-header" style="margin-bottom:12px;">
+  <div id="serverless-modal" class="modal-overlay u-c8be1ccb">
+    <div class="liquid-card u-0142c1d1">
+      <div class="settings-modal-header u-3ef1fa1a">
         <h3>⚡ Connect Without Server (Offline P2P)</h3>
         <button type="button" id="close-serverless-btn" class="btn-close-modal">&times;</button>
       </div>
-      <p class="settings-hint" style="margin-bottom:16px;">
+      <p class="settings-hint u-79a1c5a5">
         Connect directly to another phone over local Wi-Fi / hotspot with zero server relay. Exchange offer and answer via QR code or text.
       </p>
 
       <!-- Step selection: Host or Join -->
-      <div id="serverless-role-select" style="display:flex;gap:10px;margin-bottom:16px;">
-        <button type="button" id="btn-sl-start" class="btn-liquid-enter" style="flex:1;justify-content:center;font-size:13px;padding:12px 8px;">
+      <div class="u-8d05cacc" id="serverless-role-select">
+        <button type="button" id="btn-sl-start" class="btn-liquid-enter u-b98e9914">
           1. Start (Show Offer)
         </button>
-        <button type="button" id="btn-sl-join" class="btn-action-sm" style="flex:1;justify-content:center;font-size:13px;padding:12px 8px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);">
+        <button type="button" id="btn-sl-join" class="btn-action-sm u-ec6ba4a8">
           2. Join (Scan Offer)
         </button>
       </div>
 
       <!-- Step A: Initiator Screen -->
-      <div id="sl-initiator-view" style="display:none;">
-        <h4 style="font-size:13px;color:var(--primary);margin-bottom:8px;">Device A: Offer Code</h4>
-        <div id="sl-offer-qr" style="background:#fff;padding:12px;border-radius:12px;display:flex;justify-content:center;align-items:center;min-height:180px;margin-bottom:10px;"></div>
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <button type="button" id="btn-copy-offer" class="btn-action-sm" style="flex:1;padding:8px;background:rgba(255,255,255,0.1);color:#fff;">📋 Copy Offer Text</button>
+      <div class="u-c8be1ccb" id="sl-initiator-view">
+        <h4 class="u-b61fad82">Device A: Offer Code</h4>
+        <div class="u-9b91efc4" id="sl-offer-qr"></div>
+        <div class="u-1ce40f0b">
+          <button type="button" id="btn-copy-offer" class="btn-action-sm u-1fd8f6ba">📋 Copy Offer Text</button>
         </div>
         <p class="settings-hint">Now paste the Answer from Device B below:</p>
-        <textarea id="sl-answer-input" rows="3" placeholder="Paste Device B answer here..." style="width:100%;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;padding:10px;font-family:var(--font-mono);font-size:11px;resize:none;margin-bottom:8px;"></textarea>
-        <button type="button" id="btn-submit-answer" class="btn-liquid-enter" style="width:100%;justify-content:center;padding:10px;">Accept Answer</button>
+        <textarea class="u-a7403ffb" id="sl-answer-input" rows="3" placeholder="Paste Device B answer here..."></textarea>
+        <button type="button" id="btn-submit-answer" class="btn-liquid-enter u-675eb32c">Accept Answer</button>
       </div>
 
       <!-- Step B: Responder Screen -->
-      <div id="sl-responder-view" style="display:none;">
-        <h4 style="font-size:13px;color:var(--primary);margin-bottom:8px;">Device B: Paste Offer</h4>
-        <textarea id="sl-offer-input" rows="3" placeholder="Paste Device A offer here..." style="width:100%;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;padding:10px;font-family:var(--font-mono);font-size:11px;resize:none;margin-bottom:8px;"></textarea>
-        <button type="button" id="btn-submit-offer" class="btn-liquid-enter" style="width:100%;justify-content:center;padding:10px;margin-bottom:12px;">Generate Answer</button>
+      <div class="u-c8be1ccb" id="sl-responder-view">
+        <h4 class="u-b61fad82">Device B: Paste Offer</h4>
+        <textarea class="u-a7403ffb" id="sl-offer-input" rows="3" placeholder="Paste Device A offer here..."></textarea>
+        <button type="button" id="btn-submit-offer" class="btn-liquid-enter u-c62cd9e3">Generate Answer</button>
 
-        <div id="sl-answer-display-box" style="display:none;">
-          <h4 style="font-size:13px;color:var(--primary);margin-bottom:8px;">Device B: Answer Code</h4>
-          <div id="sl-answer-qr" style="background:#fff;padding:12px;border-radius:12px;display:flex;justify-content:center;align-items:center;min-height:180px;margin-bottom:10px;"></div>
-          <button type="button" id="btn-copy-answer" class="btn-action-sm" style="width:100%;padding:8px;background:rgba(255,255,255,0.1);color:#fff;margin-bottom:8px;">📋 Copy Answer Text</button>
+        <div class="u-c8be1ccb" id="sl-answer-display-box">
+          <h4 class="u-b61fad82">Device B: Answer Code</h4>
+          <div class="u-9b91efc4" id="sl-answer-qr"></div>
+          <button type="button" id="btn-copy-answer" class="btn-action-sm u-9534644b">📋 Copy Answer Text</button>
         </div>
       </div>
 
       <!-- Step C: Pairing Code Verification Screen -->
-      <div id="sl-verify-view" style="display:none;text-align:center;padding-top:10px;">
-        <h4 style="color:#fff;margin-bottom:6px;">Confirm Security Code</h4>
+      <div class="u-e4383832" id="sl-verify-view">
+        <h4 class="u-5a77f822">Confirm Security Code</h4>
         <p class="settings-hint">Read aloud this 6-digit confirmation code. If both devices show the same code, no MITM exists.</p>
-        <div id="sl-pairing-code-badge" style="font-family:var(--font-mono);font-size:20px;font-weight:900;letter-spacing:2px;color:var(--primary);margin:16px 0;background:rgba(6,214,160,0.1);padding:12px;border-radius:12px;border:1px solid rgba(6,214,160,0.3);">Waiting for the other device...</div>
-        <div style="display:flex;gap:10px;">
-          <button type="button" id="btn-sl-confirm" class="btn-liquid-enter" style="flex:1;justify-content:center;background:#06D6A0;color:#060913;">✓ Codes Match</button>
-          <button type="button" id="btn-sl-cancel" class="btn-action-sm" style="flex:1;background:rgba(239,71,111,0.2);color:#ef4444;border:1px solid rgba(239,71,111,0.4);">✗ Mismatch</button>
+        <div class="u-8b477db8" id="sl-pairing-code-badge">Waiting for the other device...</div>
+        <div class="u-6b00e753">
+          <button type="button" id="btn-sl-confirm" class="btn-liquid-enter u-0197c782">✓ Codes Match</button>
+          <button type="button" id="btn-sl-cancel" class="btn-action-sm u-4ba64bc2">✗ Mismatch</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Safe Walk Setup Modal -->
-  <div id="safewalk-modal" class="modal-overlay" style="display:none;">
-    <div class="liquid-card" style="max-width:440px;width:100%;padding:24px;">
-      <div class="settings-modal-header" style="margin-bottom:12px;">
+  <div id="safewalk-modal" class="modal-overlay u-c8be1ccb">
+    <div class="liquid-card u-ea265e0c">
+      <div class="settings-modal-header u-3ef1fa1a">
         <h3>🚶 Start Safe Walk Timer</h3>
         <button type="button" id="close-safewalk-btn" class="btn-close-modal">&times;</button>
       </div>
-      <p class="settings-hint" style="margin-bottom:16px;">
+      <p class="settings-hint u-79a1c5a5">
         If you don't check in before the timer expires, an emergency alert with your last 10 GPS breadcrumbs is automatically dispatched.
-        <br><strong style="color:#fbbf24;">Note:</strong> Page must remain open while walking.
+        <br><strong class="u-2ddf8769">Note:</strong> Page must remain open while walking.
       </p>
       <div class="form-group-glass">
         <label for="safewalk-duration">Duration</label>
-        <select id="safewalk-duration" style="width:100%;padding:10px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;">
+        <select class="u-bb9cddd8" id="safewalk-duration">
           <option value="5">5 Minutes</option>
           <option value="10" selected>10 Minutes</option>
           <option value="15">15 Minutes</option>
@@ -581,12 +580,12 @@
           <option value="60">60 Minutes</option>
         </select>
       </div>
-      <div class="form-group-glass" style="margin-top:12px;">
+      <div class="form-group-glass u-9374e842">
         <label for="safewalk-destination">Destination / Safety Note (Optional)</label>
-        <input type="text" id="safewalk-destination" placeholder="e.g. Walking home from metro station..." style="width:100%;padding:10px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:10px;color:#fff;" />
+        <input class="u-bb9cddd8" type="text" id="safewalk-destination" placeholder="e.g. Walking home from metro station..." />
       </div>
-      <div style="display:flex;gap:10px;margin-top:20px;">
-        <button type="button" id="btn-start-safewalk" class="btn-liquid-enter" style="flex:1;justify-content:center;background:#F59E0B;color:#060913;">
+      <div class="u-080f5482">
+        <button type="button" id="btn-start-safewalk" class="btn-liquid-enter u-f7f97496">
           Start Timer & Tracking
         </button>
       </div>
@@ -594,27 +593,27 @@
   </div>
 
   <!-- Safe Walk T-60 Warning Banner -->
-  <div id="safewalk-warn-banner" class="glass-banner" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(239,71,111,0.95);border:2px solid #fff;border-radius:14px;padding:12px 20px;display:none;flex-direction:column;align-items:center;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-    <strong style="font-size:15px;color:#fff;">⚠️ Safe Walk Expiring in 60s! Are you safe?</strong>
-    <div style="display:flex;gap:10px;">
-      <button type="button" id="btn-safewalk-safe" class="btn-action-sm" style="background:#06D6A0;color:#060913;font-weight:800;padding:8px 14px;">I'm Safe (Stop)</button>
-      <button type="button" id="btn-safewalk-extend" class="btn-action-sm" style="background:rgba(255,255,255,0.2);color:#fff;padding:8px 14px;">+5 Min</button>
+  <div id="safewalk-warn-banner" class="glass-banner u-cdb38f60">
+    <strong class="u-41d32009">⚠️ Safe Walk Expiring in 60s! Are you safe?</strong>
+    <div class="u-6b00e753">
+      <button type="button" id="btn-safewalk-safe" class="btn-action-sm u-0796da62">I'm Safe (Stop)</button>
+      <button type="button" id="btn-safewalk-extend" class="btn-action-sm u-5d8f23af">+5 Min</button>
     </div>
   </div>
 
   <!-- Incident Harassment Log Modal -->
-  <div id="incident-log-modal" class="modal-overlay" style="display:none;">
-    <div class="liquid-card" style="max-width:500px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;">
-      <div class="settings-modal-header" style="margin-bottom:12px;">
+  <div id="incident-log-modal" class="modal-overlay u-c8be1ccb">
+    <div class="liquid-card u-4e977a41">
+      <div class="settings-modal-header u-3ef1fa1a">
         <h3>📝 Tamper-Evident Harassment Log</h3>
         <button type="button" id="close-incident-btn" class="btn-close-modal">&times;</button>
       </div>
       <p class="settings-hint">Entries are signed with your Ed25519 identity and hash-chained in IndexedDB to serve as admissible evidence.</p>
 
-      <form id="incident-form" style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">
+      <form class="u-34801765" id="incident-form">
         <div>
-          <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Category</label>
-          <select id="incident-cat" style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;margin-top:4px;">
+          <label class="u-51664928">Category</label>
+          <select class="u-ee32fd3b" id="incident-cat">
             <option value="stalking">Stalking / Following</option>
             <option value="verbal">Verbal Harassment / Threat</option>
             <option value="physical">Physical Assault / Grabbing</option>
@@ -624,86 +623,86 @@
           </select>
         </div>
         <div>
-          <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Incident Details</label>
-          <textarea id="incident-text" rows="3" placeholder="Describe what happened, vehicle numbers, perpetrator appearance..." style="width:100%;padding:8px;background:var(--glass-input);border:1px solid var(--glass-input-border);border-radius:8px;color:#fff;font-size:13px;resize:none;margin-top:4px;"></textarea>
+          <label class="u-51664928">Incident Details</label>
+          <textarea class="u-5fa6044a" id="incident-text" rows="3" placeholder="Describe what happened, vehicle numbers, perpetrator appearance..."></textarea>
         </div>
         <div>
-          <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Attach Photo Evidence (<= 5MB, stays local)</label>
-          <input type="file" id="incident-photo" accept="image/*" style="width:100%;color:#94a3b8;font-size:12px;margin-top:4px;" />
+          <label class="u-51664928">Attach Photo Evidence (<= 5MB, stays local)</label>
+          <input class="u-7ae57cc0" type="file" id="incident-photo" accept="image/*" />
         </div>
-        <button type="submit" class="btn-liquid-enter" style="justify-content:center;background:#ef4444;color:#fff;">
+        <button type="submit" class="btn-liquid-enter u-0e7e3940">
           🔒 Sign & Append to Hash-Chain
         </button>
       </form>
 
-      <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:14px;display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;gap:8px;">
-          <button type="button" id="btn-verify-log" class="btn-action-sm" style="flex:1;background:rgba(6,214,160,0.15);color:var(--primary);border:1px solid rgba(6,214,160,0.3);padding:8px;">🔍 Verify Chain Integrity</button>
-          <button type="button" id="btn-export-log" class="btn-action-sm" style="flex:1;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);padding:8px;">📦 Export Bundle (.json)</button>
+      <div class="u-6cc69678">
+        <div class="u-b9bbe540">
+          <button type="button" id="btn-verify-log" class="btn-action-sm u-e37d2da3">🔍 Verify Chain Integrity</button>
+          <button type="button" id="btn-export-log" class="btn-action-sm u-6bd887c1">📦 Export Bundle (.json)</button>
         </div>
-        <div id="incident-verify-result" style="font-size:12px;font-weight:600;display:none;"></div>
+        <div class="u-0f1576c0" id="incident-verify-result"></div>
   <!-- BLE Diagnostics & Counters Modal -->
-  <div id="ble-diag-modal" class="modal-overlay" style="display:none;">
-    <div class="liquid-card" style="max-width:520px;width:100%;padding:22px;max-height:85vh;overflow-y:auto;">
-      <div class="settings-modal-header" style="margin-bottom:12px;">
+  <div id="ble-diag-modal" class="modal-overlay u-c8be1ccb">
+    <div class="liquid-card u-2022fe5b">
+      <div class="settings-modal-header u-3ef1fa1a">
         <h3>📶 Bluetooth Mesh Diagnostics</h3>
         <button type="button" id="close-ble-diag-btn" class="btn-close-modal">&times;</button>
       </div>
 
-      <div id="ble-error-banner" style="display:none;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);padding:10px 14px;border-radius:10px;margin-bottom:14px;color:#fca5a5;font-size:12px;">
-        <div style="font-weight:700;display:flex;align-items:center;gap:6px;">
+      <div class="u-19e99ed2" id="ble-error-banner">
+        <div class="u-45776a35">
           <span>⚠️ Bluetooth Mesh Unavailable</span>
         </div>
-        <div id="ble-error-desc" style="margin-top:4px;">Bluetooth permissions or adapter is turned off.</div>
-        <button type="button" id="btn-fix-ble-permissions" class="btn-action-sm" style="margin-top:8px;background:#ef4444;color:#fff;padding:4px 10px;">
+        <div class="u-a3a55686" id="ble-error-desc">Bluetooth permissions or adapter is turned off.</div>
+        <button type="button" id="btn-fix-ble-permissions" class="btn-action-sm u-6b7f237a">
           Grant Permissions / Enable
         </button>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;margin-bottom:14px;">
-        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:10px;border-radius:8px;">
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Packets Tx / Rx</div>
-          <div style="font-size:16px;font-weight:700;color:#60a5fa;margin-top:4px;">
+      <div class="u-c6f72180">
+        <div class="u-8e3b5f0b">
+          <div class="u-94d816d7">Packets Tx / Rx</div>
+          <div class="u-0b862b0a">
             <span id="ble-metric-tx">0</span> / <span id="ble-metric-rx">0</span>
           </div>
         </div>
-        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:10px;border-radius:8px;">
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Dropped / Duplicates</div>
-          <div style="font-size:16px;font-weight:700;color:#f87171;margin-top:4px;">
+        <div class="u-8e3b5f0b">
+          <div class="u-94d816d7">Dropped / Duplicates</div>
+          <div class="u-b676ebef">
             <span id="ble-metric-dropped">0</span> / <span id="ble-metric-dup">0</span>
           </div>
         </div>
-        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:10px;border-radius:8px;">
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Fragments Tx / Rx</div>
-          <div style="font-size:16px;font-weight:700;color:#34d399;margin-top:4px;">
+        <div class="u-8e3b5f0b">
+          <div class="u-94d816d7">Fragments Tx / Rx</div>
+          <div class="u-776ba824">
             <span id="ble-metric-frag-tx">0</span> / <span id="ble-metric-frag-rx">0</span>
           </div>
         </div>
-        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:10px;border-radius:8px;">
-          <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Avg Hops / Queue Depth</div>
-          <div style="font-size:16px;font-weight:700;color:#fbbf24;margin-top:4px;">
+        <div class="u-8e3b5f0b">
+          <div class="u-94d816d7">Avg Hops / Queue Depth</div>
+          <div class="u-0c22de55">
             <span id="ble-metric-hops">0.0</span> / <span id="ble-metric-queue">0</span>
           </div>
         </div>
       </div>
 
-      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);padding:10px;border-radius:8px;margin-bottom:14px;font-size:12px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-          <span style="color:var(--text-muted);">GATT Connections:</span>
+      <div class="u-359b6a17">
+        <div class="u-c9d59a7d">
+          <span class="u-b8e0b1fa">GATT Connections:</span>
           <strong id="ble-metric-conn">0 / 4</strong>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-          <span style="color:var(--text-muted);">Rate-Limited Packets:</span>
+        <div class="u-c9d59a7d">
+          <span class="u-b8e0b1fa">Rate-Limited Packets:</span>
           <strong id="ble-metric-ratelimit">0</strong>
         </div>
-        <div style="display:flex;justify-content:space-between;">
-          <span style="color:var(--text-muted);">Failed Signatures Dropped:</span>
+        <div class="u-da5a4919">
+          <span class="u-b8e0b1fa">Failed Signatures Dropped:</span>
           <strong id="ble-metric-sigfail">0</strong>
         </div>
       </div>
 
-      <div style="display:flex;gap:8px;">
-        <button type="button" id="btn-export-ble-log" class="btn-liquid-enter" style="flex:1;justify-content:center;padding:10px;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">
+      <div class="u-b9bbe540">
+        <button type="button" id="btn-export-ble-log" class="btn-liquid-enter u-006c3b85">
           📥 Export BLE Log (.json)
         </button>
       </div>
