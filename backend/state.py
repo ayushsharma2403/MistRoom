@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import WebSocket
 
 clients: dict[WebSocket, dict] = {}
-seen_ids: deque = deque(maxlen=2000)
+seen_ids: dict[str, dict[str, float]] = {}
 # Per-room history dict (room -> deque(maxlen=100))
 room_histories: dict[str, deque] = {}
 # Active public beacons
@@ -60,7 +60,61 @@ history = GlobalHistoryProxy()
 
 ip_connections: Counter = Counter()
 
-RESERVED_HANDLES = {"admin", "system", "police", "anonymous"}
+import unicodedata
+
+RESERVED_HANDLES = {"admin", "system", "police", "anonymous", "ghost", "moderator"}
+
+_ZERO_WIDTH_CHARS = {'\u200b', '\u200c', '\u200d', '\ufeff', '\u200e', '\u200f'}
+
+def normalize_handle(name: str) -> str:
+    # 1. Normalize with NFKC
+    n = unicodedata.normalize("NFKC", name)
+    # 2. Strip spaces and zero-width chars
+    n = "".join(c for c in n if not c.isspace() and c not in _ZERO_WIDTH_CHARS)
+    # 3. Casefold
+    n = n.casefold()
+    # 4. Fold 0->o, 1->i (or l), rn->m
+    # In handles like Adm1n, 1 represents i; in others like p0l1ce, 1 represents l/i.
+    n = n.replace("rn", "m")
+    trans = str.maketrans({"0": "o", "1": "i"})
+    n = n.translate(trans)
+    # Also handle l -> i folding for matching admin / police
+    n = n.replace("l", "i")
+    return n
+
+def is_reserved_handle(name: str, allow_anonymous: bool = False) -> bool:
+    norm = normalize_handle(name)
+    if allow_anonymous and norm == normalize_handle("anonymous"):
+        return False
+    # Compare against normalized reserved set
+    normalized_reserved = {normalize_handle(h) for h in RESERVED_HANDLES}
+    return norm in normalized_reserved
+
+
+def is_seen_id(room: str, msg_id: str) -> bool:
+    room_seen = seen_ids.get(room)
+    if not room_seen:
+        return False
+    ts = room_seen.get(msg_id)
+    if ts is None:
+        return False
+    if time.time() - ts > 600:
+        room_seen.pop(msg_id, None)
+        return False
+    return True
+
+
+def record_seen_id(room: str, msg_id: str, ts: Optional[float] = None):
+    now = time.time()
+    if ts is None:
+        ts = now
+    if room not in seen_ids:
+        seen_ids[room] = {}
+    room_seen = seen_ids[room]
+    expired = [k for k, v in room_seen.items() if now - v > 600]
+    for k in expired:
+        room_seen.pop(k, None)
+    room_seen[msg_id] = ts
 
 
 def get_room_history(room: str) -> deque:

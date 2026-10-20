@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, ValidationError
 from backend.state import (
     clients, seen_ids, get_room_history, active_beacons, send_json, broadcast_peers,
     RESERVED_HANDLES, format_displayed_handle, cleanup_expired_beacons, peer_beacon_times,
-    peer_call_times, need_owners
+    peer_call_times, need_owners, is_reserved_handle, is_seen_id, record_seen_id
 )
 
 B32_ALPHABET = "abcdefghijklmnopqrstuvwxyz234567"
@@ -151,7 +151,7 @@ async def handle_join_v2(ws: WebSocket, msg_data: dict, challenge_nonce: str):
         return
 
     # Never allow reserved handles except Ghost mode's own rename ("Anonymous")
-    if name.lower() in {"admin", "system", "police"}:
+    if is_reserved_handle(name, allow_anonymous=bool(parsed.ghost)):
         await send_json(ws, {"t": "error", "code": "bad_frame"})
         return
 
@@ -240,17 +240,26 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
         await send_json(ws, {"t": "error", "code": "bad_frame"})
         return
 
-    mid = parsed.id
-    if mid in seen_ids:
+    # Reject any message whose ts differs from now by >600 s (600,000 ms)
+    msg_ts = msg_data.get("ts")
+    now_ms = time.time() * 1000
+    if msg_ts is None or abs(msg_ts - now_ms) > 600000:
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
         return
-    seen_ids.append(mid)
+
+    mid = parsed.id
+    current_room = clients[ws]["room"]
+    if is_seen_id(current_room, mid):
+        return
 
     # Verify signature over (room|id|ts|n|c)
-    ts = int(time.time() * 1000)
-    sig_payload = f"{parsed.room}|{mid}|{msg_data.get('ts', ts)}|{parsed.envelope.n}|{parsed.envelope.c}".encode()
+    sig_payload = f"{parsed.room}|{mid}|{msg_ts}|{parsed.envelope.n}|{parsed.envelope.c}".encode()
     if not verify_ed25519_sig(parsed.pk, parsed.sig, sig_payload):
         await send_json(ws, {"t": "error", "code": "bad_signature"})
         return
+
+    # Add id ONLY AFTER the signature has verified
+    record_seen_id(current_room, mid, time.time())
 
     sender_peer_id = clients[ws]["peer_id"]
     derived_from_pk = derive_peer_id_from_pk(parsed.pk)
@@ -276,7 +285,7 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
         "envelope": parsed.envelope.model_dump(),
         "sig": parsed.sig,
         "pk": parsed.pk,
-        "ts": msg_data.get("ts", ts),
+        "ts": msg_ts,
         "cat": parsed.cat or "general",
         "prio": parsed.prio if parsed.prio is not None else 0,
         "expected_peers": room_peer_count
@@ -373,10 +382,10 @@ async def handle_beacon_v2(ws: WebSocket, msg_data: dict):
     history_queue.append(now_sec)
 
     bid = parsed.id
-    if bid in seen_ids:
+    if is_seen_id("beacons", bid):
         return
     # Add to seen_ids only AFTER verification
-    seen_ids.append(bid)
+    record_seen_id("beacons", bid, now_sec)
 
     # handle is ALWAYS clients[ws]["name"]; ignore any client value
     handle = clients[ws].get("name") or "Citizen"
