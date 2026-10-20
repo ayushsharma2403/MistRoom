@@ -162,6 +162,12 @@ async def websocket_endpoint(ws: WebSocket):
 
             event_type = msg_data.get("t")
 
+            if event_type not in ("join", "pong"):
+                client_info = clients.get(ws)
+                if not client_info or client_info.get("peer_id") is None:
+                    await ws.send_text(json.dumps({"t": "error", "code": "not_joined"}))
+                    continue
+
             if event_type == "join":
                 await handle_join_v2(ws, msg_data, challenge_nonce)
             elif event_type == "switch_room":
@@ -204,4 +210,4 @@ if __name__ == "__main__":
     print(f"  Local Access:  http://localhost:{PORT}")
     print(f"  Hotspot/LAN:   {LAN_URL}")
     print("=============================================\n")
-    uvicorn.run("backend.server:app", host="0.0.0.0", port=PORT, reload=False, log_level="warning")
+    uvicorn.run("backend.server:app", host="0.0.0.0", port=PORT, reload=False, log_level="warning", ws_max_size=65536)
