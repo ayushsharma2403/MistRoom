@@ -11,6 +11,9 @@ import {
 } from './crypto.js';
 import { attachDataChannelEvents } from './mesh.js';
 import { appendSystemMessage, updateSOSBanner } from './ui.js';
+import { computePairingCode, canon } from './pairing_code.js';
+
+export { computePairingCode, canon };
 
 // Base64url utilities
 export function toBase64Url(str) {
@@ -29,16 +32,6 @@ export function minifySdp(sdp) {
     .split('\r\n')
     .filter(line => !line.startsWith('a=extmap:') && !line.startsWith('a=rtcp-fb:'))
     .join('\r\n');
-}
-
-// Compute 6-digit confirmation code from offer + answer SDP
-export function computePairingCode(offerSdp, answerSdp) {
-  const combined = new TextEncoder().encode(offerSdp + answerSdp);
-  const hash = sha256(combined);
-  // Take last 4 bytes as uint32 % 1000000
-  const view = new DataView(hash.buffer, hash.byteOffset, hash.byteLength);
-  const num = view.getUint32(0, false) % 1000000;
-  return num.toString().padStart(6, '0');
 }
 
 // Chunking for QR frames: payload split into k of n frames if > 1000 chars
@@ -354,4 +347,15 @@ export function confirmPairing() {
 function setupBootstrapDataChannel(dc, targetPeerId) {
   if (!dc) return;
   attachDataChannelEvents(dc, targetPeerId);
+  // Messages are dropped until both users press "Codes match" (activeBootstrap.trusted === true)
+  const originalOnMessage = dc.onmessage;
+  dc.onmessage = async event => {
+    if (activeBootstrap && !activeBootstrap.trusted) {
+      console.debug('Dropping serverless P2P packet: bootstrap pairing not confirmed yet');
+      return;
+    }
+    if (typeof originalOnMessage === 'function') {
+      return originalOnMessage.call(dc, event);
+    }
+  };
 }

@@ -331,6 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-sl-start')?.addEventListener('click', async () => {
     $('serverless-role-select').style.display = 'none';
     $('sl-initiator-view').style.display = 'block';
+    $('sl-pairing-code-badge').textContent = 'Waiting for the other device...';
     const qrContainer = $('sl-offer-qr');
     qrContainer.textContent = 'Generating offer...';
     try {
@@ -363,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-sl-join')?.addEventListener('click', () => {
     $('serverless-role-select').style.display = 'none';
     $('sl-responder-view').style.display = 'block';
+    $('sl-pairing-code-badge').textContent = 'Waiting for the other device...';
   });
 
   // Generate Answer on Responder
@@ -378,12 +380,10 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.clipboard?.writeText(encodedStr);
         appendSystemMessage('Answer text copied to clipboard.');
       };
-      // Show verify screen with code
-      setTimeout(() => {
-        $('sl-responder-view').style.display = 'none';
-        $('sl-verify-view').style.display = 'block';
-        $('sl-pairing-code-badge').textContent = pairingCode;
-      }, 4000);
+      // Show code on verify screen immediately as soon as the answer exists
+      $('sl-pairing-code-badge').textContent = pairingCode;
+      $('sl-responder-view').style.display = 'none';
+      $('sl-verify-view').style.display = 'block';
     } catch (e) {
       alert('Failed to process offer: ' + e.message);
     }
