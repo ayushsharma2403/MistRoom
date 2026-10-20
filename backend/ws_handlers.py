@@ -185,12 +185,14 @@ async def handle_join_v2(ws: WebSocket, msg_data: dict, challenge_nonce: str):
 
     cleanup_expired_beacons(force=True)
 
+    newest_beacons = sorted(active_beacons.values(), key=lambda b: b.get("ts") or 0, reverse=True)[:50]
+
     await send_json(ws, {
         "t": "history",
         "history": room_history,
         "peer_id": peer_id,
         "room": room,
-        "active_beacons": list(active_beacons.values())
+        "active_beacons": newest_beacons
     })
     await broadcast_peers()
 
