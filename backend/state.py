@@ -11,6 +11,34 @@ seen_ids: deque = deque(maxlen=2000)
 room_histories: dict[str, deque] = {}
 # Active public beacons
 active_beacons: dict[str, dict] = {}
+peer_beacon_times: dict[str, deque] = {}
+_last_beacon_cleanup: float = 0.0
+
+
+def cleanup_expired_beacons(force: bool = False):
+    global _last_beacon_cleanup
+    now_ms = time.time() * 1000
+    now_sec = now_ms / 1000
+    if not force and (now_sec - _last_beacon_cleanup < 60):
+        return
+    _last_beacon_cleanup = now_sec
+    cutoff = now_ms - (2 * 3600 * 1000)  # 2 hours in ms
+    expired_ids = [
+        bid for bid, b in active_beacons.items()
+        if (b.get("ts") or 0) < cutoff
+    ]
+    for bid in expired_ids:
+        active_beacons.pop(bid, None)
+
+    if len(active_beacons) > 100:
+        sorted_beacons = sorted(
+            active_beacons.items(),
+            key=lambda item: item[1].get("ts") or 0,
+            reverse=True
+        )
+        active_beacons.clear()
+        for k, v in sorted_beacons[:100]:
+            active_beacons[k] = v
 
 
 class GlobalHistoryProxy:

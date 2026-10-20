@@ -262,7 +262,7 @@ def test_beacon_crosses_rooms_to_all_clients(ws_server):
     async def _run():
         uri = ws_server
         async with websockets.connect(uri) as ws_a, websockets.connect(uri) as ws_b:
-            await join_ws(ws_a, "user_roomA", "roomA")
+            priv_a, pk_a, pid_a = await join_ws(ws_a, "user_roomA", "roomA")
             await join_ws(ws_b, "user_roomB", "roomB")
             await asyncio.sleep(0.05)
 
@@ -275,14 +275,24 @@ def test_beacon_crosses_rooms_to_all_clients(ws_server):
                         break
 
             # User in roomA sends beacon
+            bid = "b_test_123"
+            cat = "sos"
+            prio = 3
+            short_text = "SOS emergency test"
+            ts = int(time.time() * 1000)
+            sig_payload = f"beacon|{bid}|{cat}|{prio}|{short_text}|||{ts}".encode("utf-8")
+            sig = base64.b64encode(priv_a.sign(sig_payload)).decode()
+
             beacon_payload = {
                 "t": "beacon",
-                "id": "b_test_123",
-                "cat": "sos",
-                "prio": 3,
-                "short_text": "SOS emergency test",
+                "id": bid,
+                "cat": cat,
+                "prio": prio,
+                "short_text": short_text,
                 "handle": "user_roomA",
-                "ts": int(time.time() * 1000)
+                "ts": ts,
+                "pk": pk_a,
+                "sig": sig
             }
             await ws_a.send(json.dumps(beacon_payload))
 

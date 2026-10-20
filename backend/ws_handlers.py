@@ -3,13 +3,14 @@ import base64
 import hashlib
 import re
 import time
+from collections import deque
 from typing import Optional, Literal
 from fastapi import WebSocket
 from pydantic import BaseModel, Field, ValidationError
 
 from backend.state import (
     clients, seen_ids, get_room_history, active_beacons, send_json, broadcast_peers,
-    RESERVED_HANDLES, format_displayed_handle
+    RESERVED_HANDLES, format_displayed_handle, cleanup_expired_beacons, peer_beacon_times
 )
 
 B32_ALPHABET = "abcdefghijklmnopqrstuvwxyz234567"
@@ -98,6 +99,9 @@ class MsgAckModel(BaseModel):
     pk: Optional[str] = None
 
 
+ALLOWED_BEACON_CATS = {"sos", "women_safety", "medical", "water", "shelter", "general"}
+
+
 class BeaconModel(BaseModel):
     t: Literal["beacon"]
     id: str = Field(min_length=1, max_length=64)
@@ -108,7 +112,9 @@ class BeaconModel(BaseModel):
     lon: Optional[float] = None
     accuracy: Optional[float] = None
     handle: Optional[str] = Field(default=None, max_length=30)
-    ts: Optional[int] = None
+    ts: int
+    pk: str = Field(min_length=1)
+    sig: str = Field(min_length=1)
 
 
 class NeedResolvedModel(BaseModel):
@@ -176,6 +182,8 @@ async def handle_join_v2(ws: WebSocket, msg_data: dict, challenge_nonce: str):
     # Per-room history (never include DMs)
     room_hist = get_room_history(room)
     room_history = list(room_hist)
+
+    cleanup_expired_beacons(force=True)
 
     await send_json(ws, {
         "t": "history",
@@ -294,21 +302,77 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
 
 
 async def handle_beacon_v2(ws: WebSocket, msg_data: dict):
-    """Handle public beacon: unencrypted, broadcast to ALL connected clients in EVERY room."""
+    """Handle public beacon: verified signature, bounded parameters, rate-limited, stored up to 100."""
     try:
         parsed = BeaconModel(**msg_data)
     except ValidationError:
         await send_json(ws, {"t": "error", "code": "bad_frame"})
         return
 
+    # Category validation
+    if parsed.cat not in ALLOWED_BEACON_CATS:
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+
+    # Coordinates validation: lat [-90,90], lon [-180,180], accuracy >= 0
+    lat_val = parsed.lat
+    lon_val = parsed.lon
+    if lat_val is not None and not (-90.0 <= lat_val <= 90.0):
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+    if lon_val is not None and not (-180.0 <= lon_val <= 180.0):
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+    if parsed.accuracy is not None and parsed.accuracy < 0:
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+
+    # short_text printable check (ASCII/Unicode printable characters, max 140 chars)
+    if not parsed.short_text or len(parsed.short_text) > 140 or not parsed.short_text.isprintable():
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+
+    # Timestamp check: abs(ts - now_ms) > 300000 ms
+    now_ms = time.time() * 1000
+    if abs(parsed.ts - now_ms) > 300000:
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+
+    # Peer ID match
+    sender_pid = clients[ws].get("peer_id")
+    derived_pid = derive_peer_id_from_pk(parsed.pk)
+    if not sender_pid or derived_pid != sender_pid:
+        await send_json(ws, {"t": "error", "code": "bad_frame"})
+        return
+
+    # Verify Ed25519 signature: "beacon|id|cat|prio|short_text|lat|lon|ts"
+    lat_str = str(parsed.lat) if parsed.lat is not None else ""
+    lon_str = str(parsed.lon) if parsed.lon is not None else ""
+    sig_payload = f"beacon|{parsed.id}|{parsed.cat}|{parsed.prio}|{parsed.short_text}|{lat_str}|{lon_str}|{parsed.ts}".encode("utf-8")
+    if not verify_ed25519_sig(parsed.pk, parsed.sig, sig_payload):
+        await send_json(ws, {"t": "error", "code": "bad_signature"})
+        return
+
+    # Rate limiting: max 3 beacons per peer per minute
+    now_sec = now_ms / 1000
+    if sender_pid not in peer_beacon_times:
+        peer_beacon_times[sender_pid] = deque(maxlen=10)
+    history_queue = peer_beacon_times[sender_pid]
+    while history_queue and history_queue[0] < now_sec - 60:
+        history_queue.popleft()
+    if len(history_queue) >= 3:
+        await send_json(ws, {"t": "error", "code": "rate_limited"})
+        return
+    history_queue.append(now_sec)
+
     bid = parsed.id
     if bid in seen_ids:
         return
+    # Add to seen_ids only AFTER verification
     seen_ids.append(bid)
 
-    sender_pid = clients[ws].get("peer_id") or "unknown"
-    handle = parsed.handle or clients[ws].get("name") or "Citizen"
-    ts = parsed.ts or int(time.time() * 1000)
+    # handle is ALWAYS clients[ws]["name"]; ignore any client value
+    handle = clients[ws].get("name") or "Citizen"
 
     beacon_record = {
         "t": "beacon",
@@ -321,10 +385,19 @@ async def handle_beacon_v2(ws: WebSocket, msg_data: dict):
         "accuracy": parsed.accuracy,
         "handle": handle,
         "peer_id": sender_pid,
-        "ts": ts
+        "ts": parsed.ts,
+        "pk": parsed.pk,
+        "sig": parsed.sig
     }
 
+    # Clean expired beacons
+    cleanup_expired_beacons()
+
+    # Store max 100 beacons
     active_beacons[bid] = beacon_record
+    if len(active_beacons) > 100:
+        oldest_id = min(active_beacons.keys(), key=lambda k: active_beacons[k].get("ts") or 0)
+        active_beacons.pop(oldest_id, None)
 
     # Broadcast to ALL connected clients in every room
     for client_ws in list(clients.keys()):
