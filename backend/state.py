@@ -12,6 +12,8 @@ room_histories: dict[str, deque] = {}
 # Active public beacons
 active_beacons: dict[str, dict] = {}
 peer_beacon_times: dict[str, deque] = {}
+peer_call_times: dict[str, deque] = {}
+need_owners: dict[str, str] = {}
 _last_beacon_cleanup: float = 0.0
 
 

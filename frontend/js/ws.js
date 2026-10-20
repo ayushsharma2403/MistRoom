@@ -173,6 +173,11 @@ export function connectWebSocket(onSwitchRoom) {
 
     if (data.t === 'need_resolved') {
       if (data.id) {
+        const existing = state.openNeeds.get(data.id);
+        if (existing && existing.pk && data.pk && existing.pk !== data.pk) {
+          // Ignore resolution from unauthorized pk
+          return;
+        }
         state.openNeeds.delete(data.id);
         renderNeedsBoard();
       }

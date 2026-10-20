@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field, ValidationError
 
 from backend.state import (
     clients, seen_ids, get_room_history, active_beacons, send_json, broadcast_peers,
-    RESERVED_HANDLES, format_displayed_handle, cleanup_expired_beacons, peer_beacon_times
+    RESERVED_HANDLES, format_displayed_handle, cleanup_expired_beacons, peer_beacon_times,
+    peer_call_times, need_owners
 )
 
 B32_ALPHABET = "abcdefghijklmnopqrstuvwxyz234567"
@@ -281,6 +282,10 @@ async def handle_msg_v2(ws: WebSocket, msg_data: dict):
         "expected_peers": room_peer_count
     }
 
+    # Store owner pk for emergency need resolution
+    if (parsed.cat or "general") in ("sos", "women_safety", "medical", "water", "shelter"):
+        need_owners[mid] = parsed.pk
+
     if parsed.target_peer:
         # Ghost cannot appear as a DM target: reject DMs targeting a ghost user
         target_info = next((cl for cl in clients.values() if cl.get("peer_id") == parsed.target_peer), None)
@@ -414,6 +419,12 @@ async def handle_need_resolved_v2(ws: WebSocket, msg_data: dict):
         await send_json(ws, {"t": "error", "code": "bad_frame"})
         return
 
+    # Server accepts only if pk equals the stored owner pk of that need id
+    owner_pk = need_owners.get(parsed.id)
+    if not owner_pk or parsed.pk != owner_pk:
+        await send_json(ws, {"t": "error", "code": "forbidden"})
+        return
+
     sig_payload = f"resolve|{parsed.id}".encode()
     if not verify_ed25519_sig(parsed.pk, parsed.sig, sig_payload):
         await send_json(ws, {"t": "error", "code": "bad_signature"})
@@ -457,30 +468,72 @@ async def handle_msg_ack_v2(ws: WebSocket, msg_data: dict):
 
 
 async def handle_signaling_v2(ws: WebSocket, msg_data: dict):
+    # Sender must be joined
+    client_info = clients.get(ws)
+    if not client_info or not client_info.get("peer_id"):
+        await send_json(ws, {"t": "error", "code": "not_joined"})
+        return
+
     try:
         parsed = SignalingModel(**msg_data)
     except ValidationError:
         await send_json(ws, {"t": "error", "code": "bad_frame"})
         return
 
+    sender_pid = client_info["peer_id"]
+    sender_name = client_info["name"]
+    sender_room = client_info["room"]
+
+    # call_invite limited to 3/min per sender
+    if parsed.t == "call_invite":
+        now_sec = time.time()
+        if sender_pid not in peer_call_times:
+            peer_call_times[sender_pid] = deque(maxlen=10)
+        call_queue = peer_call_times[sender_pid]
+        while call_queue and call_queue[0] < now_sec - 60:
+            call_queue.popleft()
+        if len(call_queue) >= 3:
+            await send_json(ws, {"t": "error", "code": "rate_limited"})
+            return
+        call_queue.append(now_sec)
+
     target = parsed.target
     if target:
+        found_target = False
         for target_ws, info in clients.items():
             if info.get("peer_id") == target:
+                found_target = True
+                # Target must be in the same room
+                if info.get("room") != sender_room:
+                    await send_json(ws, {"t": "error", "code": "room_mismatch"})
+                    return
+                # Always overwrite sender, from_peer, and name with verified values
+                payload_data = dict(parsed.data) if isinstance(parsed.data, dict) else {}
+                payload_data["from_peer"] = sender_pid
+                payload_data["name"] = sender_name
                 await send_json(target_ws, {
                     "t": parsed.t,
-                    "sender": clients[ws]["peer_id"],
-                    "sender_name": clients[ws]["name"],
-                    "data": parsed.data
+                    "target": target,
+                    "sender": sender_pid,
+                    "sender_name": sender_name,
+                    "from_peer": sender_pid,
+                    "name": sender_name,
+                    "data": payload_data
                 })
                 break
+        if not found_target:
+            await send_json(ws, {"t": "error", "code": "target_unavailable"})
     elif parsed.t == "p2p_file":
-        current_room = clients[ws]["room"]
         for target_ws, info in clients.items():
-            if target_ws != ws and info.get("room") == current_room:
+            if target_ws != ws and info.get("room") == sender_room:
+                payload_data = dict(parsed.data) if isinstance(parsed.data, dict) else {}
+                payload_data["from_peer"] = sender_pid
+                payload_data["name"] = sender_name
                 await send_json(target_ws, {
                     "t": "p2p_file",
-                    "sender": clients[ws]["peer_id"],
-                    "sender_name": clients[ws]["name"],
-                    "data": parsed.data
+                    "sender": sender_pid,
+                    "sender_name": sender_name,
+                    "from_peer": sender_pid,
+                    "name": sender_name,
+                    "data": payload_data
                 })

@@ -495,7 +495,8 @@ export function appendMessageToUI(msg, autoScroll = true) {
         prio: msg.prio || 1,
         text: msg.text,
         vitals: msg.vitals || {},
-        ts: msg.ts || Date.now()
+        ts: msg.ts || Date.now(),
+        pk: msg.pk
       });
       renderNeedsBoard();
     }
