@@ -3,7 +3,7 @@ import io
 import socket
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
-from backend.config import PORT
+from backend.config import PORT, FRONTEND_DIR
 
 try:
     import segno
@@ -55,3 +55,20 @@ def get_qr_svg(request: Request):
 @router.get("/api/info")
 def get_info():
     return JSONResponse({"url": LAN_URL})
+
+
+@router.get("/sw.js")
+def get_service_worker():
+    sw_path = FRONTEND_DIR / "sw.js"
+    build_id_file = FRONTEND_DIR / "build-id.txt"
+    build_id = build_id_file.read_text(encoding="utf-8").strip() if build_id_file.exists() else "dev"
+    content = sw_path.read_text(encoding="utf-8") if sw_path.exists() else ""
+    content = content.replace("__BUILD_ID__", build_id)
+    return Response(
+        content,
+        media_type="application/javascript",
+        headers={
+            "Cache-Control": "no-cache",
+            "Service-Worker-Allowed": "/"
+        }
+    )

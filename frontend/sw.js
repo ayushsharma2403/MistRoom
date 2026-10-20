@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mistroom-v2-cache-20261017-v3';
+const CACHE_NAME = 'mistroom-ac17528771bcfadf';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -32,8 +32,15 @@ const PRECACHE_ASSETS = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(PRECACHE_ASSETS);
+    caches.open(CACHE_NAME).then(async cache => {
+      // Precache with per-asset try/catch so one 404 does not abort install
+      for (const asset of PRECACHE_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn(`[SW] Precache failed for ${asset}:`, err);
+        }
+      }
     }).then(() => self.skipWaiting())
   );
 });

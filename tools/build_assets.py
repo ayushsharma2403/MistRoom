@@ -30,6 +30,20 @@ def main():
     index_file.write_text(html, encoding="utf-8")
     print(f"Assets versioned: style.css?v={css_hash}, app.js?v={app_hash}")
 
+    # Write build-id.txt
+    build_id = f"{css_hash}{app_hash}"
+    build_id_file = FRONTEND_DIR / "build-id.txt"
+    build_id_file.write_text(build_id, encoding="utf-8")
+
+    # Update sw.js with build_id
+    sw_file = FRONTEND_DIR / "sw.js"
+    if sw_file.exists():
+        sw_content = sw_file.read_text(encoding="utf-8")
+        # Replace either literal __BUILD_ID__ or previous CACHE_NAME pattern
+        sw_content = re.sub(r"const CACHE_NAME = 'mistroom-[^']*';", f"const CACHE_NAME = 'mistroom-{build_id}';", sw_content)
+        sw_file.write_text(sw_content, encoding="utf-8")
+        print(f"Updated sw.js CACHE_NAME to mistroom-{build_id}")
+
 
 if __name__ == "__main__":
     main()
