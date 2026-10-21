@@ -511,6 +511,22 @@
         Connect directly to another phone over local Wi-Fi / hotspot with zero server relay. Exchange offer and answer via QR code or text.
       </p>
 
+      <div class="form-group-glass">
+        <label for="sl-passkey-input">Shared passkey for this pairing</label>
+        <div class="glass-input-wrapper">
+          <input 
+            id="sl-passkey-input" 
+            type="password" 
+            placeholder="Minimum 8 characters" 
+            minlength="8"
+            autocomplete="off" 
+          />
+        </div>
+        <div id="sl-passkey-error" class="input-inline-error u-0d16411a">
+          Passkey must be at least 8 characters.
+        </div>
+      </div>
+
       <!-- Step selection: Host or Join -->
       <div class="u-8d05cacc" id="serverless-role-select">
         <button type="button" id="btn-sl-start" class="btn-liquid-enter u-b98e9914">

@@ -394,17 +394,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Confirmation of match
   $('btn-sl-confirm')?.addEventListener('click', async () => {
-    confirmPairing();
-    if (serverlessModal) serverlessModal.style.display = 'none';
-    // If not joined yet, unlock the chat interface in serverless room
+    // If not joined yet, derive encryption key using the shared passkey
     if (!state.cryptoKey) {
+      const passkeyVal = ($('sl-passkey-input')?.value || '').trim();
+      const errorEl = $('sl-passkey-error');
+      if (passkeyVal.length < 8) {
+        if (errorEl) errorEl.style.display = 'block';
+        return;
+      }
+      if (errorEl) errorEl.style.display = 'none';
+
+      confirmPairing();
+      if (serverlessModal) serverlessModal.style.display = 'none';
+
       state.currentNickname = state.currentNickname || 'OfflinePeer';
       state.currentRoom = 'offline-mesh';
-      state.cryptoKey = await deriveEncryptionKey('serverless-mesh-key', state.currentRoom);
+      state.cryptoKey = await deriveEncryptionKey(passkeyVal, state.currentRoom);
       $('join-modal').style.display = 'none';
       $('active-room-badge').textContent = '#offline-mesh';
       $('status-dot').className = 'status-dot online';
       $('status-text').textContent = 'P2P Direct';
+    } else {
+      confirmPairing();
+      if (serverlessModal) serverlessModal.style.display = 'none';
     }
   });
 
