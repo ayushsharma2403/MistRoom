@@ -38,7 +38,7 @@ class ServerThread(threading.Thread):
 @pytest.fixture(scope="module")
 def ws_server():
     from backend.server import app
-    port = 3097
+    port = 3110
     server = ServerThread(app, port)
     server.start()
     time.sleep(0.5)
@@ -123,7 +123,7 @@ def make_signed_msg(priv, pk_b64, mid, room="global", ts=None, nonce="n1", ciphe
 @pytest.mark.asyncio
 async def test_invalid_sig_does_not_poison_dedupe(ws_server):
     """Invalid-sig frame with id X does not stop the valid message with id X."""
-    headers = {"Origin": "http://127.0.0.1:3097"}
+    headers = {"Origin": "http://127.0.0.1:3110"}
     async with websockets.connect(ws_server, additional_headers=headers) as ws_alice, \
                websockets.connect(ws_server, additional_headers=headers) as ws_bob:
         alice_priv, alice_pk, alice_pid, _ = await join_client(ws_alice, name="Alice", room="global")
@@ -150,7 +150,7 @@ async def test_invalid_sig_does_not_poison_dedupe(ws_server):
 @pytest.mark.asyncio
 async def test_ts_older_than_10_min_rejected(ws_server):
     """Message with ts older than 10 min rejected."""
-    headers = {"Origin": "http://127.0.0.1:3097"}
+    headers = {"Origin": "http://127.0.0.1:3110"}
     async with websockets.connect(ws_server, additional_headers=headers) as ws_alice:
         alice_priv, alice_pk, alice_pid, _ = await join_client(ws_alice, name="Alice", room="global")
 
@@ -167,7 +167,7 @@ async def test_ts_older_than_10_min_rejected(ws_server):
 @pytest.mark.asyncio
 async def test_reserved_handles_normalized_rejected(ws_server):
     """'Adm1n', 'Ghost', 'a d m i n' rejected."""
-    headers = {"Origin": "http://127.0.0.1:3097"}
+    headers = {"Origin": "http://127.0.0.1:3110"}
 
     for handle in ["Adm1n", "Ghost", "a d m i n"]:
         async with websockets.connect(ws_server, additional_headers=headers) as ws:

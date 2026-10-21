@@ -38,7 +38,7 @@ class ServerThread(threading.Thread):
 @pytest.fixture(scope="module")
 def ws_server():
     from backend.server import app
-    port = 3098
+    port = 3111
     server = ServerThread(app, port)
     server.start()
     time.sleep(0.5)
@@ -98,7 +98,7 @@ async def join_client(ws, name="Alice", room="global"):
 @pytest.mark.asyncio
 async def test_p2p_file_rate_limit(ws_server):
     """Send 64 p2p_file frames in 2 s; none get rate_limited."""
-    headers = {"Origin": "http://127.0.0.1:3098"}
+    headers = {"Origin": "http://127.0.0.1:3111"}
     async with websockets.connect(ws_server, additional_headers=headers) as ws_alice, \
                websockets.connect(ws_server, additional_headers=headers) as ws_bob:
         alice_priv, alice_pk, alice_pid, _ = await join_client(ws_alice, name="Alice", room="global")

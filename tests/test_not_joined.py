@@ -25,7 +25,7 @@ class ServerThread(threading.Thread):
 @pytest.fixture(scope="module")
 def ws_server():
     from backend.server import app
-    port = 3097
+    port = 3113
     server = ServerThread(app, port)
     server.start()
     time.sleep(0.5)
@@ -46,7 +46,7 @@ def clean_state():
 
 @pytest.mark.asyncio
 async def test_unjoined_client_gets_not_joined_error(ws_server):
-    async with websockets.connect(ws_server, origin="http://127.0.0.1:3097") as ws:
+    async with websockets.connect(ws_server, origin="http://127.0.0.1:3113") as ws:
         # First message from server is challenge
         challenge_raw = await ws.recv()
         challenge_data = json.loads(challenge_raw)

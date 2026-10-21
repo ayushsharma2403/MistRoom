@@ -27,7 +27,7 @@ class ServerThread(threading.Thread):
 @pytest.fixture(scope="module")
 def ws_server():
     from backend.server import app
-    port = 3097
+    port = 3112
     server = ServerThread(app, port)
     server.start()
     time.sleep(0.5)

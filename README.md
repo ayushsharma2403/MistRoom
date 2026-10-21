@@ -1,6 +1,6 @@
 # MistRoom – Privacy-First Anonymous Emergency Mesh Chat
 
-> **Tech Stack:** Python 3.11 (FastAPI, uvicorn), WebSockets, WebCrypto E2EE (AES-256-GCM), WebRTC P2P Voice & DataChannels, Docker
+> **Tech Stack:** Python 3.11 (FastAPI, uvicorn), WebSockets, E2EE (XChaCha20-Poly1305, PBKDF2, Ed25519), WebRTC P2P Voice & DataChannels, Docker
 
 MistRoom is an offline-capable, privacy-first emergency communication application designed for disaster relief, crisis zones, women's safety, and local network mesh messaging. It operates completely memory-only by design: zero database, zero cloud access, no user accounts, and zero persistent storage of messages or user IP addresses.
 
