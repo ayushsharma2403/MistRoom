@@ -239,12 +239,13 @@ export function renderNeedsBoard() {
     helpBtn.textContent = 'I can help';
     helpBtn.style.padding = '4px 8px';
     helpBtn.style.fontSize = '11px';
-    helpBtn.addEventListener('click', () => {
-      // Open DM with requester
+    helpBtn.addEventListener('click', async () => {
+      // Open DM with requester and send direct offer
       state.activeDirectPeer = { peer_id: item.peer_id, name: item.from };
       $('dm-banner').style.display = 'flex';
       $('dm-peer-name').textContent = item.from;
       $('message-input').focus();
+      await sendMessage('I can help with your request.');
     });
     btnRow.append(helpBtn);
 
