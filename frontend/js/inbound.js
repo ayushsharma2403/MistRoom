@@ -27,6 +27,9 @@ export function createInbound(deps) {
     if (msg.peer_id && state.blockedPeerIds && state.blockedPeerIds.has(msg.peer_id)) {
       return false;
     }
+    if (msg.peer_id === state.myPeerId && state.messagesHistory && state.messagesHistory.some(m => m.id === msg.id)) {
+      return false;
+    }
 
     // 2 drop DM not addressed to me / room mismatch
     const isTargetedToMe = msg.target_peer === state.myPeerId;

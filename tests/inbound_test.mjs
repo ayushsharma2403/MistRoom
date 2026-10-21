@@ -124,6 +124,31 @@ async function runTests() {
     assert.equal(undecryptableMsg.route, 'P2P Direct');
   }
 
+  // Test case 6: echo of own message already in messagesHistory must not render
+  {
+    const rendered = [];
+    const state = {
+      myPeerId: 'peerA',
+      currentRoom: 'lobby',
+      blockedPeerIds: new Set(),
+      messagesHistory: [{ id: 'm-own-1', peer_id: 'peerA', text: 'my local msg' }],
+    };
+    const deps = {
+      state,
+      verifySignature: async () => true,
+      decryptEnvelope: async () => 'my local msg',
+      render: (msg) => rendered.push(msg),
+      now: () => 1000,
+    };
+    const handleInbound = createInbound(deps);
+
+    const echoMsg = { id: 'm-own-1', peer_id: 'peerA', room: 'lobby' };
+    const res = await handleInbound(echoMsg, 'Relay');
+
+    assert.equal(res, false, 'Echo of own message already in history must return false');
+    assert.equal(rendered.length, 0, 'Render must not be called for own echo');
+  }
+
   console.log('All inbound_test.mjs test cases passed.');
 }
 
