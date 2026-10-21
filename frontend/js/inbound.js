@@ -2,6 +2,8 @@
  * Central inbound message pipeline for all transport channels.
  */
 
+import { derivePeerIdFromPk, base64ToBytes } from './crypto.js';
+
 export function createInbound(deps) {
   const { state, verifySignature, decryptEnvelope, render, now = () => Date.now() } = deps;
   const done = new Set();
@@ -24,6 +26,11 @@ export function createInbound(deps) {
   async function handleInboundMessage(msg, source) {
     // 1 drop if msg.id missing or sender in state.blockedPeerIds
     if (!msg || !msg.id) return false;
+    if (!msg.peer_id && msg.pk) {
+      try {
+        msg.peer_id = derivePeerIdFromPk(base64ToBytes(msg.pk));
+      } catch (e) {}
+    }
     if (msg.peer_id && state.blockedPeerIds && state.blockedPeerIds.has(msg.peer_id)) {
       return false;
     }
