@@ -425,6 +425,8 @@ body {
 
 /* Glass Header */
 .glass-header {
+  position: relative;
+  z-index: 100;
   background: var(--glass-card);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -1532,7 +1534,7 @@ body {
 .u-99e9127e { display:none;background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-size:11px;padding:3px 8px;border-radius:99px;cursor:pointer; }
 .u-0cc66a8f { background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);cursor:pointer; }
 .u-87db2275 { position:relative; }
-.u-bc7f017a { display:none;position:absolute;right:0;top:100%;margin-top:6px;min-width:160px;z-index:999;padding:6px;flex-direction:column;gap:4px; }
+.u-bc7f017a { display:none;position:absolute;right:0;top:100%;margin-top:6px;min-width:160px;z-index:9999;padding:6px;flex-direction:column;gap:4px; }
 .u-8a03bd50 { width:100%;text-align:left;background:transparent;border:none;color:#fff;padding:8px;font-size:13px;border-radius:6px;cursor:pointer; }
 .u-b3ceedc4 { width:100%;text-align:left;background:transparent;border:none;color:var(--primary);padding:8px;font-size:13px;border-radius:6px;cursor:pointer;font-weight:700; }
 .u-543c19db { height:1px;background:rgba(255,255,255,0.1);margin:4px 0; }

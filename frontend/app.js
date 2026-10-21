@@ -731,9 +731,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabBtnPeers = $('tab-btn-peers');
   const tabBtnNeeds = $('tab-btn-needs');
   const tabBtnMesh = $('tab-btn-mesh');
-  const panelPeers = $('tab-panel-peers');
-  const panelNeeds = $('tab-panel-needs');
-  const panelMesh = $('tab-panel-mesh');
+  const panelPeers = $('panel-peers');
+  const panelNeeds = $('panel-needs');
+  const panelMesh = $('panel-mesh');
 
   function selectTab(activeTab) {
     if (tabBtnPeers) tabBtnPeers.classList.toggle('active', activeTab === 'peers');
