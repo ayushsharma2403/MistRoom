@@ -382,7 +382,10 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       // Show code on verify screen immediately as soon as the answer exists
       $('sl-pairing-code-badge').textContent = pairingCode;
-      $('sl-responder-view').style.display = 'none';
+      const verifyHint = $('sl-verify-view')?.querySelector('.settings-hint');
+      if (verifyHint) {
+        verifyHint.textContent = 'Show this answer to the other device, then compare the code.';
+      }
       $('sl-verify-view').style.display = 'block';
     } catch (e) {
       alert('Failed to process offer: ' + e.message);
