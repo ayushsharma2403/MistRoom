@@ -134,7 +134,8 @@ async def websocket_endpoint(ws: WebSocket):
 
     # Ephemeral IP connection counter (in-memory only, no IPs logged)
     client_ip = ws.client.host if ws.client else "unknown"
-    if ip_connections[client_ip] >= 200:
+    max_conns = 1000 if (client_ip in ("127.0.0.1", "::1", "localhost") and (os.getenv("MISTROOM_BENCHMARK") == "1" or os.getenv("BENCHMARK_MODE") == "1")) else 200
+    if ip_connections[client_ip] >= max_conns:
         await ws.close(code=1008, reason="Connection limit exceeded")
         return
     ip_connections[client_ip] += 1

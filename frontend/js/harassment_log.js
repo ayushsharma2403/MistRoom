@@ -157,3 +157,68 @@ export async function exportIncidentLogBundle() {
     witness_receipts: []
   };
 }
+
+export async function verifyExternalBundle(bundle) {
+  if (!bundle || typeof bundle !== 'object') {
+    return { ok: false, reason: 'Invalid bundle: Not a JSON object' };
+  }
+
+  const entries = bundle.entries || [];
+  const pubKeyB64 = bundle.public_key;
+  const headHash = bundle.head_hash;
+
+  if (!pubKeyB64) {
+    return { ok: false, reason: 'Missing public_key in bundle' };
+  }
+
+  let pubKeyBytes;
+  try {
+    pubKeyBytes = base64ToBytes(pubKeyB64);
+  } catch (e) {
+    return { ok: false, reason: 'Invalid base64 in public_key' };
+  }
+
+  if (entries.length === 0) {
+    return { ok: true, count: 0, headHash: 'GENESIS' };
+  }
+
+  let prevHash = 'GENESIS';
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (entry.idx !== i) {
+      return { ok: false, brokenIndex: i, reason: `Index mismatch at ${i}: got ${entry.idx}` };
+    }
+    if (entry.prevHash !== prevHash) {
+      return { ok: false, brokenIndex: i, reason: `Chain broken at entry #${i}: prevHash does not match previous entry hash` };
+    }
+
+    const dataBytes = canonicalEntryBytes(entry);
+    const computedHash = bytesToHex(sha256(dataBytes));
+    if (entry.hash !== computedHash) {
+      return { ok: false, brokenIndex: i, reason: `Hash mismatch at entry #${i}: computed ${computedHash.substring(0, 8)} != recorded ${entry.hash ? entry.hash.substring(0, 8) : 'none'}` };
+    }
+
+    if (!entry.sig) {
+      return { ok: false, brokenIndex: i, reason: `Missing signature at entry #${i}` };
+    }
+
+    try {
+      const sigBytes = base64ToBytes(entry.sig);
+      const valid = ed25519.verify(sigBytes, new TextEncoder().encode(entry.hash), pubKeyBytes);
+      if (!valid) {
+        return { ok: false, brokenIndex: i, reason: `Invalid digital signature at entry #${i}` };
+      }
+    } catch (e) {
+      return { ok: false, brokenIndex: i, reason: `Signature verification error at entry #${i}: ${e.message}` };
+    }
+
+    prevHash = computedHash;
+  }
+
+  if (headHash && headHash !== prevHash) {
+    return { ok: false, reason: `Head hash mismatch: recorded ${headHash} != computed ${prevHash}` };
+  }
+
+  return { ok: true, count: entries.length, headHash: prevHash, publicKey: pubKeyB64 };
+}

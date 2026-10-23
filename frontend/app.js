@@ -1,6 +1,7 @@
 /**
  * MistRoom Application Root: wires ES modules, sets up event listeners.
  */
+console.log('[DEBUG TOP] app.js script executing top-level');
 import { state, $ } from './js/state.js';
 import {
   deriveEncryptionKey, getOrCreateIdentity, restoreIdentityFromPhrase
@@ -30,7 +31,7 @@ import {
   startSafeWalk, extendSafeWalk, stopSafeWalk, triggerSafeWalkAlert
 } from './js/safewalk.js';
 import {
-  addIncidentLogEntry, verifyIncidentLog, exportIncidentLogBundle
+  addIncidentLogEntry, verifyIncidentLog, exportIncidentLogBundle, verifyExternalBundle
 } from './js/harassment_log.js';
 
 export function switchRoom(newRoom) {
@@ -94,7 +95,9 @@ async function handleJoin() {
   connectWebSocket(switchRoom);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
+  console.log('[DEBUG] initApp starting...');
+  window.__ranInit = true;
   if (typeof window.RTCPeerConnection === 'undefined') {
     state.webrtcAvailable = false;
     const hideSelectors = [
@@ -312,7 +315,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const jm = $('join-modal');
     if (jm && !state.cryptoKey) jm.style.display = 'none';
-    if (serverlessModal) serverlessModal.style.display = 'flex';
+    if (serverlessModal) {
+      serverlessModal.classList.remove('u-c8be1ccb');
+      serverlessModal.classList.remove('is-hidden');
+      serverlessModal.style.display = 'flex';
+    }
     $('sl-initiator-view').style.display = 'none';
     $('sl-responder-view').style.display = 'none';
     $('sl-verify-view').style.display = 'none';
@@ -322,7 +329,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (serverlessJoinBtn) serverlessJoinBtn.addEventListener('click', openServerlessModal);
   if (closeServerlessBtn) closeServerlessBtn.addEventListener('click', () => {
     resetActiveBootstrap();
-    if (serverlessModal) serverlessModal.style.display = 'none';
+    if (serverlessModal) {
+      serverlessModal.classList.add('u-c8be1ccb');
+      serverlessModal.style.display = 'none';
+    }
     const jm = $('join-modal');
     if (jm && !state.cryptoKey) jm.style.display = 'flex';
   });
@@ -569,6 +579,46 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(url);
     appendSystemMessage('📦 Incident evidence bundle exported.');
   });
+
+  const btnVerifyExternal = $('btn-verify-external-evidence');
+  const importEvidenceFileInput = $('import-evidence-file');
+
+  async function handleVerifyExternalFile() {
+    const file = importEvidenceFileInput?.files?.[0];
+    const resultDiv = $('incident-verify-result');
+    if (!file) {
+      if (resultDiv) {
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#ef4444';
+        resultDiv.textContent = 'Please select a JSON evidence file first.';
+      }
+      return;
+    }
+    try {
+      const text = await file.text();
+      const bundle = JSON.parse(text);
+      const res = await verifyExternalBundle(bundle);
+      if (resultDiv) {
+        resultDiv.style.display = 'block';
+        if (res.ok) {
+          resultDiv.style.color = '#34d399';
+          resultDiv.textContent = `✓ External Bundle Valid: All ${res.count} entries verified (Creator: ${res.creatorPeerId || 'Unknown'}).`;
+        } else {
+          resultDiv.style.color = '#ef4444';
+          resultDiv.textContent = `✗ External Bundle Invalid: ${res.reason}`;
+        }
+      }
+    } catch (err) {
+      if (resultDiv) {
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#ef4444';
+        resultDiv.textContent = `✗ Error reading file: ${err.message}`;
+      }
+    }
+  }
+
+  if (btnVerifyExternal) btnVerifyExternal.addEventListener('click', handleVerifyExternalFile);
+  if (importEvidenceFileInput) importEvidenceFileInput.addEventListener('change', handleVerifyExternalFile);
 
 
   const attachFileBtn = $('attach-file-btn');
@@ -1004,5 +1054,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 

@@ -1,13 +1,52 @@
-"""Playwright E2E tests for MistRoom (Requires playwright installed)."""
 import os
 import hashlib
+import socket
+import threading
+import time
 import pytest
+import uvicorn
 
 try:
     import playwright
     from playwright.sync_api import sync_playwright
 except ImportError:
     sync_playwright = None
+
+from backend.server import app
+
+
+class UvicornServerThread(threading.Thread):
+    def __init__(self, host="127.0.0.1", port=3001):
+        super().__init__(daemon=True)
+        self.host = host
+        self.port = port
+        self.config = uvicorn.Config(app, host=self.host, port=self.port, log_level="warning")
+        self.server = uvicorn.Server(self.config)
+
+    def run(self):
+        self.server.run()
+
+    def stop(self):
+        self.server.should_exit = True
+
+
+@pytest.fixture(scope="module", autouse=True)
+def ensure_server_running():
+    # Check if 3001 is already listening
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    is_open = sock.connect_ex(("127.0.0.1", 3001)) == 0
+    sock.close()
+
+    server = None
+    if not is_open:
+        server = UvicornServerThread(port=3001)
+        server.start()
+        time.sleep(1.0)
+
+    yield
+
+    if server:
+        server.stop()
 
 
 @pytest.mark.skipif(sync_playwright is None, reason="Playwright is not installed in the current environment")

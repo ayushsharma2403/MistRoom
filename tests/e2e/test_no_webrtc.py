@@ -27,9 +27,20 @@ class UvicornServerThread(threading.Thread):
         self.server.should_exit = True
 
 
+import socket
+
+
+def get_free_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+
 @pytest.mark.skipif(sync_playwright is None, reason="Playwright is not installed")
 def test_no_webrtc_page_loads_and_joins():
-    test_port = 3108
+    test_port = get_free_port()
     server = UvicornServerThread(port=test_port)
     server.start()
     time.sleep(1.0)

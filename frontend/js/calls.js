@@ -41,8 +41,11 @@ export async function startCall(peer) {
 
   $('call-peer-title').textContent = `📞 Voice Call with ${peer.name}`;
   $('call-status-label').textContent = 'Calling...';
-  $('call-modal').classList.add('is-shown');
-  $('call-modal').classList.remove('is-hidden');
+  const cm = $('call-modal');
+  cm.classList.remove('u-c8be1ccb');
+  cm.classList.remove('is-hidden');
+  cm.classList.add('is-shown');
+  cm.style.display = 'flex';
 
   state.activeCallPeerConnection = new RTCPeerConnection(getRtcConfig());
   state.localMediaStream.getTracks().forEach(track => {
@@ -104,8 +107,11 @@ export async function handleIncomingCallInvite(senderPeerId, senderName, data) {
 
   $('incoming-caller-name').textContent = senderName;
   $('incoming-call-type').textContent = 'Incoming voice call...';
-  $('incoming-call-toast').classList.add('is-shown');
-  $('incoming-call-toast').classList.remove('is-hidden');
+  const toast = $('incoming-call-toast');
+  toast.classList.remove('u-c8be1ccb');
+  toast.classList.remove('is-hidden');
+  toast.classList.add('is-shown');
+  toast.style.display = 'flex';
 }
 
 export async function acceptIncomingCall() {
@@ -126,8 +132,11 @@ export async function acceptIncomingCall() {
 
   $('call-peer-title').textContent = `📞 Voice Call with ${name}`;
   $('call-status-label').textContent = 'Connecting...';
-  $('call-modal').classList.add('is-shown');
-  $('call-modal').classList.remove('is-hidden');
+  const cm = $('call-modal');
+  cm.classList.remove('u-c8be1ccb');
+  cm.classList.remove('is-hidden');
+  cm.classList.add('is-shown');
+  cm.style.display = 'flex';
 
   state.activeCallPeerConnection = new RTCPeerConnection(getRtcConfig());
   state.localMediaStream.getTracks().forEach(track => {
@@ -208,8 +217,10 @@ export function endCall(notifyRemote = true) {
   }
 
   stopCallTimer();
-  $('call-modal').classList.add('is-hidden');
-  $('call-modal').classList.remove('is-shown');
+  const cm = $('call-modal');
+  cm.classList.add('is-hidden');
+  cm.classList.remove('is-shown');
+  cm.style.display = 'none';
   const remoteAudio = $('remote-audio');
   if (remoteAudio) remoteAudio.srcObject = null;
   state.currentCallPeer = null;

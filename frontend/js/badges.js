@@ -123,6 +123,27 @@ export function verifyBadge(badge, expectedSubjectPk = null) {
   return { status: 'verified', badge };
 }
 
+export function issueBadge({ issuerName, issuerPkB64, issuerPrivKeyBytes, subjectPkB64, role = 'medic', validityDays = 30 }) {
+  const now = Math.floor(Date.now() / 1000);
+  const expiresAt = now + validityDays * 86400;
+  const badgePayload = {
+    v: 1,
+    issuer_name: issuerName,
+    issuer_pk: issuerPkB64,
+    subject_pk: subjectPkB64,
+    role: role,
+    issued_at: now,
+    expires_at: expiresAt
+  };
+  const canonicalBytes = canonicalBadgeBytes(badgePayload);
+  const sigBytes = ed25519.sign(canonicalBytes, issuerPrivKeyBytes);
+  const sigB64 = btoa(String.fromCharCode(...sigBytes));
+  return {
+    ...badgePayload,
+    sig: sigB64
+  };
+}
+
 export function getMyBadge() {
   try {
     const raw = localStorage.getItem(MY_BADGE_STORAGE_KEY);

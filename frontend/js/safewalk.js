@@ -31,11 +31,11 @@ export function getSafeWalkState() {
 
 // Request screen wake lock
 async function acquireWakeLock() {
-  if ('wakeLock' in navigator) {
+  if (window.isSecureContext && 'wakeLock' in navigator) {
     try {
       wakeLock = await navigator.wakeLock.request('screen');
     } catch (e) {
-      console.debug('Wake lock request denied:', e);
+      // Graceful fallback for non-supported or policy-blocked environments
     }
   }
 }

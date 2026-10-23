@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#060913">
 <title>MistRoom – Anonymous Mesh & Safety Hub</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=17f373f4">
+<link rel="stylesheet" href="style.css?v=dc260b5c">
 <script src="vendor/qrcode.js"></script>
 <script src="vendor/jsqr.js"></script>
 </head>
@@ -458,6 +458,30 @@
             <textarea class="u-307cc1ab" id="import-badge-input" rows="2" placeholder='{"v":1,"issuer_name":"...","role":"medic"...}'></textarea>
             <button type="button" id="btn-save-badge" class="btn-action-sm u-346c588b">Save Badge</button>
           </div>
+
+          <!-- Authority Key Generation & Badge Issuer Tool -->
+          <details class="u-d8a81eac u-5c1778e6">
+            <summary class="u-c74f84f3">⚙️ Authority Tools: Key Generator & Badge Issuer</summary>
+            <div class="u-ecfea829">
+              <button type="button" id="btn-gen-authority-keys" class="btn-action-sm">Generate Authority Ed25519 Keypair</button>
+              <div class="u-b3a31904" id="auth-generated-keys-box">
+                <div><strong>Public Key (Base64):</strong> <span id="auth-display-pk"></span></div>
+                <div class="u-64aaef32"><strong>Private Key (Base64 - Keep Secret!):</strong> <span id="auth-display-sk"></span></div>
+              </div>
+              <div class="u-082f6e5d">
+                <label class="u-51664928">Issue Badge to Peer Public Key:</label>
+                <input class="u-fb6f94e5 u-4feedf8e" type="text" id="issue-subject-pk-input" placeholder="Subject Peer Ed25519 Public Key (Base64)" />
+                <select id="issue-role-select" class="u-ee32fd3b u-4feedf8e">
+                  <option value="medic">Medic / Healthcare</option>
+                  <option value="volunteer">Volunteer / Relief Worker</option>
+                  <option value="coordinator">Disaster Coordinator</option>
+                  <option value="rescue">Search & Rescue</option>
+                </select>
+                <button type="button" id="btn-issue-badge-now" class="btn-action-sm">Sign & Generate Badge JSON</button>
+                <textarea id="issued-badge-output" class="u-307cc1ab u-a502a805" rows="3" readonly placeholder="Signed badge JSON will appear here..."></textarea>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -667,6 +691,13 @@
           <button type="button" id="btn-verify-log" class="btn-action-sm u-e37d2da3">🔍 Verify Chain Integrity</button>
           <button type="button" id="btn-export-log" class="btn-action-sm u-6bd887c1">📦 Export Bundle (.json)</button>
         </div>
+        <div class="u-598bcd3f u-5c1778e6">
+          <label class="u-51664928" for="import-evidence-file">🛡️ Verify External Evidence Bundle (.json):</label>
+          <div class="u-53b81f56">
+            <input type="file" id="import-evidence-file" accept=".json,application/json" class="u-7ae57cc0 u-ee3d55bf" />
+            <button type="button" id="btn-verify-external-evidence" class="btn-action-sm u-93c6e1d4">Verify File</button>
+          </div>
+        </div>
         <div class="u-0f1576c0" id="incident-verify-result"></div>
       </div>
     </div>
@@ -741,6 +772,6 @@
   </div>
 </div>
 
-<script type="module" src="app.js?v=ad2be6d8"></script>
+<script type="module" src="app.js?v=c4dcf5d1"></script>
 </body>
 </html>

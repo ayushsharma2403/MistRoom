@@ -14,14 +14,30 @@ except ImportError:
 FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 
 
+class CustomHandler(http.server.SimpleHTTPRequestHandler):
+    extensions_map = {
+        **http.server.SimpleHTTPRequestHandler.extensions_map,
+        ".js": "application/javascript",
+        ".mjs": "application/javascript",
+        ".json": "application/json",
+        ".css": "text/css",
+    }
+
+
+class ThreadingServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    request_queue_size = 128
+    allow_reuse_address = True
+
+
 class StaticHttpServerThread(threading.Thread):
-    def __init__(self, port=8989):
+    def __init__(self, port=0):
         super().__init__(daemon=True)
-        self.port = port
-        handler = lambda *args, **kwargs: http.server.SimpleHTTPRequestHandler(
+        handler = lambda *args, **kwargs: CustomHandler(
             *args, directory=str(FRONTEND_DIR), **kwargs
         )
-        self.httpd = socketserver.TCPServer(("127.0.0.1", port), handler)
+        self.httpd = ThreadingServer(("127.0.0.1", port), handler)
+        self.port = self.httpd.server_address[1]
 
     def run(self):
         self.httpd.serve_forever()
@@ -34,7 +50,7 @@ class StaticHttpServerThread(threading.Thread):
 @pytest.mark.skipif(sync_playwright is None, reason="Playwright is not installed in the current environment")
 def test_serverless_qr_pairing_and_message_delivery():
     """Verify that two browser contexts can pair via copy-paste text and chat with the server completely stopped."""
-    server = StaticHttpServerThread(port=8989)
+    server = StaticHttpServerThread(port=0)
     server.start()
     time.sleep(0.3)
 
@@ -42,14 +58,14 @@ def test_serverless_qr_pairing_and_message_delivery():
         with sync_playwright() as p:
             browser1 = p.chromium.launch(headless=True)
             browser2 = p.chromium.launch(headless=True)
-            ctx1 = browser1.new_context()
-            ctx2 = browser2.new_context()
+            ctx1 = browser1.new_context(permissions=["clipboard-read", "clipboard-write"])
+            ctx2 = browser2.new_context(permissions=["clipboard-read", "clipboard-write"])
             page1 = ctx1.new_page()
             page2 = ctx2.new_page()
 
             # Open directly from static file server (no FastAPI / no WebSockets running)
-            page1.goto("http://127.0.0.1:8989")
-            page2.goto("http://127.0.0.1:8989")
+            page1.goto(f"http://127.0.0.1:{server.port}")
+            page2.goto(f"http://127.0.0.1:{server.port}")
 
             # Open Serverless dialog on Page 1 (Initiator)
             page1.wait_for_selector("#serverless-join-btn", state="visible")
@@ -58,7 +74,7 @@ def test_serverless_qr_pairing_and_message_delivery():
             page1.click("#btn-sl-start")
 
             # Wait for offer text to be ready
-            page1.wait_for_selector("#sl-offer-qr img, #sl-offer-qr pre", timeout=8000)
+            page1.wait_for_selector("#sl-offer-qr img, #sl-offer-qr pre, #sl-offer-qr svg, #sl-offer-qr canvas", timeout=8000)
             page1.click("#btn-copy-offer")
 
             # Device B: Open Serverless dialog (Responder)
@@ -69,13 +85,15 @@ def test_serverless_qr_pairing_and_message_delivery():
 
             # Device B receives Offer from clipboard/variable
             # In headless browser, get encoded offer from page1 JS state
-            offer_str = page1.evaluate("navigator.clipboard ? navigator.clipboard.readText() : ''")
+            offer_str = page1.evaluate("""async () => {
+                try {
+                    if (navigator.clipboard) return await navigator.clipboard.readText();
+                } catch (e) {}
+                return window.__testOffer || '';
+            }""")
+
             if not offer_str:
-                # Fallback directly from bootstrap state
-                offer_str = page1.evaluate("window.__testOffer || ''")
-                if not offer_str:
-                    # Get from textarea / DOM
-                    offer_str = page1.evaluate("() => { const el = document.querySelector('#sl-offer-qr pre'); return el ? el.textContent : ''; }")
+                offer_str = page1.evaluate("() => { const el = document.querySelector('#sl-offer-qr pre'); return el ? el.textContent : ''; }")
 
             if offer_str:
                 page2.fill("#sl-offer-input", offer_str)
@@ -84,7 +102,12 @@ def test_serverless_qr_pairing_and_message_delivery():
                 # Device B displays Answer
                 page2.wait_for_selector("#btn-copy-answer", timeout=6000)
                 page2.click("#btn-copy-answer")
-                answer_str = page2.evaluate("navigator.clipboard ? navigator.clipboard.readText() : ''")
+                answer_str = page2.evaluate("""async () => {
+                    try {
+                        if (navigator.clipboard) return await navigator.clipboard.readText();
+                    } catch (e) {}
+                    return window.__testAnswer || '';
+                }""")
 
                 if answer_str:
                     page1.fill("#sl-answer-input", answer_str)

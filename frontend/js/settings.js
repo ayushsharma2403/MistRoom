@@ -5,8 +5,9 @@ import { state, $ } from './state.js';
 import { appendSystemMessage, renderPeers } from './ui.js';
 import { DB_NAME } from './outbox.js';
 import { LOG_DB_NAME } from './harassment_log.js';
-import { addTrustedAuthority, setMyBadge, getMyBadge } from './badges.js';
-import { generateEphemeralIdentity } from './crypto.js';
+import { addTrustedAuthority, setMyBadge, getMyBadge, issueBadge } from './badges.js';
+import { generateEphemeralIdentity, base64ToBytes } from './crypto.js';
+import { ed25519 } from '../vendor/noble-crypto.js';
 
 export const WORDLIST = [
   'alpha', 'beacon', 'cipher', 'delta', 'echo', 'falcon', 'ghost', 'harbor',
@@ -255,6 +256,69 @@ export function setupSettingsUI() {
       } catch (e) {
         alert('Invalid badge JSON');
       }
+    });
+  }
+
+  // In-browser Authority Key Generator & Badge Issuer Wiring
+  let activeAuthorityPrivKey = null;
+  let activeAuthorityPubKeyB64 = null;
+
+  const btnGenAuthKeys = $('btn-gen-authority-keys');
+  if (btnGenAuthKeys) {
+    btnGenAuthKeys.addEventListener('click', () => {
+      const privKey = ed25519.utils.randomPrivateKey();
+      const pubKey = ed25519.getPublicKey(privKey);
+      activeAuthorityPrivKey = privKey;
+      activeAuthorityPubKeyB64 = btoa(String.fromCharCode(...pubKey));
+      const privKeyB64 = btoa(String.fromCharCode(...privKey));
+
+      const box = $('auth-generated-keys-box');
+      if (box) box.style.display = 'block';
+      const pkSpan = $('auth-display-pk');
+      if (pkSpan) pkSpan.textContent = activeAuthorityPubKeyB64;
+      const skSpan = $('auth-display-sk');
+      if (skSpan) skSpan.textContent = privKeyB64;
+
+      // Automatically fill the "Add Trusted Authority" form
+      const authPkInput = $('add-auth-pk-input');
+      if (authPkInput) authPkInput.value = activeAuthorityPubKeyB64;
+      const authNameInput = $('add-auth-name-input');
+      if (authNameInput && !authNameInput.value) authNameInput.value = 'My Local Authority';
+
+      appendSystemMessage('🔑 Generated new Authority Keypair.');
+    });
+  }
+
+  const btnIssueBadgeNow = $('btn-issue-badge-now');
+  if (btnIssueBadgeNow) {
+    btnIssueBadgeNow.addEventListener('click', () => {
+      const subjectPk = ($('issue-subject-pk-input')?.value || '').trim();
+      if (!subjectPk) {
+        alert('Please provide the Subject Peer Public Key (Base64).');
+        return;
+      }
+      if (!activeAuthorityPrivKey || !activeAuthorityPubKeyB64) {
+        alert('Please generate or provide an Authority Keypair first.');
+        return;
+      }
+      const role = $('issue-role-select')?.value || 'medic';
+      const issuerName = ($('add-auth-name-input')?.value || 'Local Authority').trim();
+
+      const badge = issueBadge({
+        issuerName,
+        issuerPkB64: activeAuthorityPubKeyB64,
+        issuerPrivKeyBytes: activeAuthorityPrivKey,
+        subjectPkB64: subjectPk,
+        role,
+        validityDays: 30
+      });
+
+      const outTextarea = $('issued-badge-output');
+      if (outTextarea) {
+        outTextarea.style.display = 'block';
+        outTextarea.value = JSON.stringify(badge, null, 2);
+      }
+      appendSystemMessage(`🏅 Signed and issued ${role} badge for peer ${subjectPk.substring(0, 8)}...`);
     });
   }
 
