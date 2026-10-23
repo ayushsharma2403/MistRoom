@@ -52,15 +52,19 @@ def test_serverless_qr_pairing_and_message_delivery():
             page2.goto("http://127.0.0.1:8989")
 
             # Open Serverless dialog on Page 1 (Initiator)
+            page1.wait_for_selector("#serverless-join-btn", state="visible")
             page1.click("#serverless-join-btn")
+            page1.wait_for_selector("#btn-sl-start", state="visible")
             page1.click("#btn-sl-start")
 
             # Wait for offer text to be ready
-            page1.wait_for_selector("#sl-offer-qr img, #sl-offer-qr pre", timeout=5000)
+            page1.wait_for_selector("#sl-offer-qr img, #sl-offer-qr pre", timeout=8000)
             page1.click("#btn-copy-offer")
 
             # Device B: Open Serverless dialog (Responder)
+            page2.wait_for_selector("#serverless-join-btn", state="visible")
             page2.click("#serverless-join-btn")
+            page2.wait_for_selector("#btn-sl-join", state="visible")
             page2.click("#btn-sl-join")
 
             # Device B receives Offer from clipboard/variable

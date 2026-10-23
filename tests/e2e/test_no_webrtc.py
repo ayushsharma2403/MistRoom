@@ -29,9 +29,10 @@ class UvicornServerThread(threading.Thread):
 
 @pytest.mark.skipif(sync_playwright is None, reason="Playwright is not installed")
 def test_no_webrtc_page_loads_and_joins():
-    server = UvicornServerThread(port=3001)
+    test_port = 3108
+    server = UvicornServerThread(port=test_port)
     server.start()
-    time.sleep(0.5)
+    time.sleep(1.0)
 
     page_errors = []
 
@@ -47,7 +48,7 @@ def test_no_webrtc_page_loads_and_joins():
             page.on("pageerror", lambda err: page_errors.append(str(err)))
 
             # Navigate to MistRoom
-            page.goto("http://127.0.0.1:3001/")
+            page.goto(f"http://127.0.0.1:{test_port}/")
 
             # Ensure no uncaught page errors on initial load
             assert len(page_errors) == 0, f"Page errors on load: {page_errors}"
