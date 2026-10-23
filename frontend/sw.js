@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mistroom-dc260b5cc4dcf5d1';
+const CACHE_NAME = 'mistroom-15938188778c0ef0';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',

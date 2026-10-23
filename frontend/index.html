@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#060913">
 <title>MistRoom – Anonymous Mesh & Safety Hub</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=dc260b5c">
+<link rel="stylesheet" href="style.css?v=15938188">
 <script src="vendor/qrcode.js"></script>
 <script src="vendor/jsqr.js"></script>
 </head>
@@ -42,13 +42,18 @@
 
     <div id="join-form" class="liquid-form">
       <div class="form-group-glass">
-        <label for="nickname-input">Handle / Pseudonym</label>
+        <label for="nickname-input">Display Alias</label>
         <div class="glass-input-wrapper">
-          <span class="input-icon">👤</span>
+          <span class="input-icon" aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </span>
           <input 
             id="nickname-input" 
             type="text" 
-            placeholder="e.g. Athena, Citizen-9" 
+            placeholder="Enter your alias" 
             maxlength="20" 
             autocomplete="off" 
             autofocus 
@@ -57,13 +62,17 @@
       </div>
 
       <div class="form-group-glass">
-        <label for="passkey-input">Room passkey (end-to-end encrypted)</label>
+        <label for="passkey-input">Room Passkey (End-to-End Encrypted)</label>
         <div class="glass-input-wrapper">
-          <span class="input-icon">🔑</span>
+          <span class="input-icon" aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5M19 5l-2.5 2.5m-5 5A5 5 0 1 0 5 18a5 5 0 0 0 6.5-6.5l8.5-8.5"></path>
+            </svg>
+          </span>
           <input 
             id="passkey-input" 
             type="password" 
-            placeholder="Shared secret password" 
+            placeholder="Room passkey" 
             autocomplete="off" 
           />
           <button type="button" id="toggle-eye" class="glass-eye-btn" title="Show or hide password" aria-label="Toggle password visibility">
@@ -81,7 +90,14 @@
       <div class="form-group-glass">
         <label for="room-input">Mesh Frequency / Room</label>
         <div class="glass-input-wrapper">
-          <span class="input-icon">#</span>
+          <span class="input-icon" aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="4" y1="9" x2="20" y2="9"></line>
+              <line x1="4" y1="15" x2="20" y2="15"></line>
+              <line x1="10" y1="3" x2="8" y2="21"></line>
+              <line x1="16" y1="3" x2="14" y2="21"></line>
+            </svg>
+          </span>
           <input 
             id="room-input" 
             type="text" 
@@ -97,16 +113,34 @@
           <span class="btn-liquid-text">Enter Secure Mesh</span>
           <span class="btn-liquid-arrow">→</span>
         </button>
-        <button type="button" id="serverless-join-btn" class="btn-action-sm u-115a27b4">
-          ⚡ Connect without Server (QR / P2P)
+        <button type="button" id="serverless-join-btn" class="btn-secondary-mesh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          <span>Connect without Server (QR / P2P)</span>
         </button>
-        <button type="button" id="restore-phrase-btn" class="btn-action-sm u-eed62598">
-          🔑 Restore from Recovery Phrase
+        <button type="button" id="restore-phrase-btn" class="btn-secondary-mesh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>Restore from Recovery Phrase</span>
         </button>
       </div>
 
       <div class="zero-knowledge-footer">
-        <span>🔒 Zero Accounts • Zero Plaintext • Zero Logs</span>
+        <div class="zk-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>Zero-Knowledge • Ephemeral RAM Only</span>
+        </div>
+        <div class="zk-links">
+          <button type="button" id="btn-open-privacy" class="zk-link-btn">Privacy Policy</button>
+          <span class="zk-link-sep">•</span>
+          <button type="button" id="btn-open-cookies" class="zk-link-btn">Cookies</button>
+        </div>
       </div>
     </div>
   </div>
@@ -116,7 +150,13 @@
 <div id="restore-modal" class="modal-overlay u-c8be1ccb">
   <div class="liquid-card u-ea265e0c">
     <div class="settings-modal-header u-3ef1fa1a">
-      <h3>🔑 Restore Identity</h3>
+      <h3 class="u-3088da11">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span>Restore Identity</span>
+      </h3>
       <button type="button" id="close-restore-btn" class="btn-close-modal">&times;</button>
     </div>
     <p class="settings-hint">Enter your 12-word recovery phrase separated by spaces. This will regenerate your exact Ed25519 keypair and peer ID.</p>
@@ -127,6 +167,47 @@
     <button type="button" id="submit-restore-btn" class="btn-liquid-enter u-2976360a">
       Validate & Restore Identity
     </button>
+  </div>
+</div>
+
+<!-- Privacy Policy Modal -->
+<div id="privacy-policy-modal" class="modal-overlay u-c8be1ccb">
+  <div class="liquid-card u-ea265e0c">
+    <div class="settings-modal-header u-3ef1fa1a">
+      <h3 class="u-3088da11">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+        <span>Privacy Policy</span>
+      </h3>
+      <button type="button" id="close-privacy-btn" class="btn-close-modal">&times;</button>
+    </div>
+    <div class="u-8be15e81">
+      <p><strong class="u-83b020b7">Zero Data Retention:</strong> MistRoom is engineered with zero database persistence. We never collect names, phone numbers, email addresses, or device identifiers.</p>
+      <p><strong class="u-83b020b7">End-to-End Encryption:</strong> All communications within rooms are encrypted on your device using keys derived from your secret room passkey. The relay server processes solely opaque binary ciphertexts in volatile RAM and cannot read message contents.</p>
+      <p><strong class="u-83b020b7">Local Cryptographic Storage:</strong> Your identity and outbox queues reside exclusively in your browser's private IndexedDB on this device and are never exported without your explicit action.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Cookies Policy Modal -->
+<div id="cookies-modal" class="modal-overlay u-c8be1ccb">
+  <div class="liquid-card u-ea265e0c">
+    <div class="settings-modal-header u-3ef1fa1a">
+      <h3 class="u-3088da11">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+          <path d="M2 12h20"></path>
+        </svg>
+        <span>Cookies & Local Storage</span>
+      </h3>
+      <button type="button" id="close-cookies-btn" class="btn-close-modal">&times;</button>
+    </div>
+    <div class="u-ef179ba3">
+      <p><strong class="u-83b020b7">Zero Tracking Cookies:</strong> MistRoom uses zero third-party cookies, zero tracking pixels, and zero analytics beacons.</p>
+      <p><strong class="u-83b020b7">Local Functional State:</strong> The app utilizes standard browser Web Storage (`localStorage` and `IndexedDB`) solely to preserve offline settings (such as your chosen emergency room, ghost mode preference, and offline queued messages) locally on your device.</p>
+    </div>
   </div>
 </div>
 
@@ -772,6 +853,6 @@
   </div>
 </div>
 
-<script type="module" src="app.js?v=c4dcf5d1"></script>
+<script type="module" src="app.js?v=778c0ef0"></script>
 </body>
 </html>

@@ -326,8 +326,15 @@ body {
 
 .input-icon {
   padding-left: 14px;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.input-icon svg {
+  display: block;
 }
 
 .glass-input-wrapper input {
@@ -350,17 +357,25 @@ body {
   cursor: pointer;
   display: flex;
   align-items: center;
+  transition: color 0.15s;
 }
 
 .glass-eye-btn:hover {
   color: var(--text-main);
 }
 
+/* Join Actions */
+.join-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 /* Enter Button (3D Liquid Primary) */
 .btn-liquid-enter {
   width: 100%;
-  padding: 14px;
-  margin-top: 10px;
+  padding: 13px 16px;
   border: none;
   border-radius: 14px;
   background: linear-gradient(135deg, #06D6A0 0%, #05B386 50%, #048C69 100%);
@@ -399,12 +414,90 @@ body {
   transform: translateX(4px);
 }
 
+/* Secondary Mesh Buttons */
+.btn-secondary-mesh {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary-mesh:hover {
+  background: rgba(6, 214, 160, 0.12);
+  border-color: rgba(6, 214, 160, 0.35);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.btn-secondary-mesh:active {
+  transform: translateY(0);
+}
+
+.btn-secondary-mesh svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* Zero Knowledge Footer */
 .zero-knowledge-footer {
   text-align: center;
-  margin-top: 16px;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
   font-size: 11px;
   color: var(--text-muted);
-  letter-spacing: 0.2px;
+}
+
+.zk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.zk-badge svg {
+  color: var(--primary);
+}
+
+.zk-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zk-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
+  transition: color 0.15s;
+}
+
+.zk-link-btn:hover {
+  color: var(--text-main);
+  text-decoration-color: var(--primary);
+}
+
+.zk-link-sep {
+  opacity: 0.4;
+  font-size: 10px;
 }
 
 /* -------------------------------------------------------------
@@ -1651,3 +1744,10 @@ body {
 .u-53b81f56 { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 .u-ee3d55bf { flex: 1; }
 .u-93c6e1d4 { white-space: nowrap; }
+
+
+/* generated from inline styles */
+.u-3088da11 { display: flex; align-items: center; gap: 8px; }
+.u-8be15e81 { font-size: 13px; color: var(--text-muted); line-height: 1.6; display: flex; flex-direction: column; gap: 12px; max-height: 380px; overflow-y: auto; }
+.u-83b020b7 { color: var(--text-main); }
+.u-ef179ba3 { font-size: 13px; color: var(--text-muted); line-height: 1.6; display: flex; flex-direction: column; gap: 12px; }
